@@ -33,7 +33,7 @@ let phylopicIndex = {};
 const getPhylopicIndex = () => phylopicIndex;
 
 map.on('load', () => {
-  const TILES_RELEASE_URL = 'https://github.com/Ossssip/Berlin-trees-hex/releases/download/data-latest/berlin_trees.pmtiles';
+  const TILES_RELEASE_URL = 'https://berlin-trees-pmtiles.ossssip.workers.dev/';
   const tilesUrl = `pmtiles://${TILES_RELEASE_URL}`;
   const tilesRawUrl = TILES_RELEASE_URL;
 
