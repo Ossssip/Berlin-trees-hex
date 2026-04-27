@@ -1,0 +1,10 @@
+berlin_trees:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DATABASE_PATH', 'data/berlin_trees.duckdb') }}"
+      threads: 4
+      extensions:
+        - spatial
+        - h3

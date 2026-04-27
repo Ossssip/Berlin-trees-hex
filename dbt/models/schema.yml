@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: stg_ortsteile
+    columns:
+      - name: geometry
+        tests:
+          - not_null
+  - name: stg_ortsteile_detail
+    columns:
+      - name: ortsteil_code
+        tests:
+          - not_null
+          - unique
+      - name: ortsteil_name
+        tests:
+          - not_null
+      - name: bezirk_code
+        tests:
+          - not_null
+      - name: geometry
+        tests:
+          - not_null
+  - name: stg_bezirke
+    columns:
+      - name: bezirk_code
+        tests:
+          - not_null
+          - unique
+      - name: bezirk_name
+        tests:
+          - not_null
+      - name: geometry
+        tests:
+          - not_null
+  - name: stg_strassenbaeume
+    columns:
+      - name: tree_id
+        tests:
+          - not_null
+      - name: geometry
+        tests:
+          - not_null
+      - name: source
+        tests:
+          - not_null
+  - name: stg_anlagenbaeume
+    columns:
+      - name: tree_id
+        tests:
+          - not_null
+      - name: geometry
+        tests:
+          - not_null
+      - name: source
+        tests:
+          - not_null
+  - name: stg_gruen_berlin
+    columns:
+      - name: tree_id
+        tests:
+          - not_null
+      - name: geometry
+        tests:
+          - not_null
+      - name: source
+        tests:
+          - not_null
+  - name: int_trees_unified
+    columns:
+      - name: tree_uuid
+        tests:
+          - unique
+          - not_null
+      - name: source
+        tests:
+          - accepted_values:
+              values: ['strassenbaeume', 'anlagenbaeume', 'gruen_berlin']

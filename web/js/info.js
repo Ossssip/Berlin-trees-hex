@@ -388,10 +388,6 @@ async function loadSummary(tilesRawUrl) {
     const meta = await p.getMetadata();
     if (meta?.dataset_summary) return meta.dataset_summary;
   } catch (_) {}
-  try {
-    const r = await fetch('public/dataset_summary.json');
-    if (r.ok) return r.json();
-  } catch (_) {}
   return null;
 }
 

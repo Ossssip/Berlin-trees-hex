@@ -1,0 +1,21 @@
+name: berlin_trees
+version: "1.0"
+config-version: 2
+
+profile: berlin_trees
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target"]
+
+models:
+  berlin_trees:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: table
+    marts:
+      +materialized: table

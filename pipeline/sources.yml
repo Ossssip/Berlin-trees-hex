@@ -1,0 +1,50 @@
+# WFS source definitions — consumed by pipeline/fetch_wfs.py and referenced by dvc.yaml
+# All endpoints are GDI-BE (Berlin Geoportal) WFS 2.0.0.
+# All data is stored in native CRS (EPSG:25833); reprojection to EPSG:4326 happens in aggregate_h3.py.
+# Licenses: dl-de/zero-2-0 for all sources except gruen_berlin (dl-de/by-2-0).
+
+alkis_ortsteile:
+  url: "https://gdi.berlin.de/services/wfs/alkis_ortsteile"
+  layer: "alkis_ortsteile:ortsteile"
+  geometry_type: "Polygon"
+  crs: "EPSG:25833"
+  description: "Berlin Ortsteile (districts) — ALKIS cadastre. Used primarily for city-extent boundary."
+  govdata: "https://www.govdata.de/suche/daten/alkis-berlin"
+  license: "dl-de/zero-2-0"
+
+baumbestand_anlagen:
+  url: "https://gdi.berlin.de/services/wfs/baumbestand"
+  layer: "baumbestand:anlagenbaeume"
+  geometry_type: "Point"
+  crs: "EPSG:25833"
+  description: "Baumbestand Berlin — Anlagenbäume (park/facility trees incl. street trees in green spaces)."
+  govdata: "https://www.govdata.de/suche/daten/baumbestand-berlin"
+  license: "dl-de/zero-2-0"
+
+baumbestand_strassen:
+  url: "https://gdi.berlin.de/services/wfs/baumbestand"
+  layer: "baumbestand:strassenbaeume"
+  geometry_type: "Point"
+  crs: "EPSG:25833"
+  description: "Baumbestand Berlin — Straßenbäume (street trees)."
+  govdata: "https://www.govdata.de/suche/daten/baumbestand-berlin"
+  license: "dl-de/zero-2-0"
+
+gruen_berlin:
+  url: "https://gdi.berlin.de/services/wfs/baumbestand_gruen_berlin"
+  layer: "baumbestand_gruen_berlin:anlagenbaum_gruenberlin"
+  geometry_type: "Point"
+  crs: "EPSG:25833"
+  description: "Baumbestand in den Liegenschaften der Grün Berlin GmbH (Anlagenbäume)."
+  govdata: "https://www.govdata.de/suche/daten/baumbestand-in-den-liegenschaften-der-grun-berlin-gmbh-anlagenbaume"
+  license: "dl-de/by-2-0"
+
+forstbetriebskarte:
+  url: "https://gdi.berlin.de/services/wfs/ua_forstbetriebskarte_2014"
+  layer: "ua_forstbetriebskarte_2014:c_hauptbaumarten"
+  geometry_type: "Polygon"
+  crs: "EPSG:25833"
+  description: "Alters- und Bestandesstruktur der Wälder — Forstbetriebskarte 2014 (Umweltatlas). Hauptbaumarten layer with age classes."
+  govdata: "https://www.govdata.de/suche/daten/alters-und-bestandesstruktur-der-walder-forstbetriebskarte-2014-umweltatlas"
+  license: "dl-de/zero-2-0"
+  note: "Two additional layers available: a_mischbaumarten (mixed species), b_forstverwalt (admin units). Fetch only c_hauptbaumarten for now."

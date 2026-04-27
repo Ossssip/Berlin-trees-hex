@@ -1,1 +1,23 @@
+# PMTiles — hosted on GitHub Releases, too large for git
 *.pmtiles
+
+# DVC pipeline outputs
+data/raw/
+data/processed/
+data/tiles_input/
+data/icon_curation/
+data/berlin_trees.duckdb
+dvc.lock
+
+# dbt compiled artifacts
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# OS
+.DS_Store

@@ -1,0 +1,108 @@
+# Pipeline stages — filled in per phase.
+# Run: dvc repro
+
+stages:
+  fetch_alkis_ortsteile:
+    cmd: python pipeline/fetch_wfs.py --source alkis_ortsteile
+    deps:
+      - pipeline/fetch_wfs.py
+    params:
+      - pipeline/sources.yml:
+          - alkis_ortsteile
+      - data/checksums.json:
+          - alkis_ortsteile.count
+    outs:
+      - data/raw/alkis_ortsteile.parquet
+
+  fetch_baumbestand_anlagen:
+    cmd: python pipeline/fetch_wfs.py --source baumbestand_anlagen
+    deps:
+      - pipeline/fetch_wfs.py
+    params:
+      - pipeline/sources.yml:
+          - baumbestand_anlagen
+      - data/checksums.json:
+          - baumbestand_anlagen.count
+    outs:
+      - data/raw/baumbestand_anlagen.parquet
+
+  fetch_baumbestand_strassen:
+    cmd: python pipeline/fetch_wfs.py --source baumbestand_strassen
+    deps:
+      - pipeline/fetch_wfs.py
+    params:
+      - pipeline/sources.yml:
+          - baumbestand_strassen
+      - data/checksums.json:
+          - baumbestand_strassen.count
+    outs:
+      - data/raw/baumbestand_strassen.parquet
+
+  fetch_gruen_berlin:
+    cmd: python pipeline/fetch_wfs.py --source gruen_berlin
+    deps:
+      - pipeline/fetch_wfs.py
+    params:
+      - pipeline/sources.yml:
+          - gruen_berlin
+      - data/checksums.json:
+          - gruen_berlin.count
+    outs:
+      - data/raw/gruen_berlin.parquet
+
+  fetch_forstbetriebskarte:
+    cmd: python pipeline/fetch_wfs.py --source forstbetriebskarte
+    deps:
+      - pipeline/fetch_wfs.py
+    params:
+      - pipeline/sources.yml:
+          - forstbetriebskarte
+      - data/checksums.json:
+          - forstbetriebskarte.count
+    outs:
+      - data/raw/forstbetriebskarte.parquet
+
+  transform:
+    cmd: python pipeline/init_db.py && dbt run --profiles-dir ./dbt --project-dir ./dbt && dbt test --profiles-dir ./dbt --project-dir ./dbt && python pipeline/export_trees.py
+    deps:
+      - data/raw/alkis_ortsteile.parquet
+      - data/raw/baumbestand_anlagen.parquet
+      - data/raw/baumbestand_strassen.parquet
+      - data/raw/gruen_berlin.parquet
+      - data/raw/forstbetriebskarte.parquet
+      - dbt/models/
+    outs:
+      - data/berlin_trees.duckdb
+      - data/processed/trees.parquet
+
+  aggregate:
+    cmd: python pipeline/aggregate_all.py
+    deps:
+      - pipeline/aggregate_all.py
+      - pipeline/aggregate_h3.py
+      - pipeline/aggregate_admin.py
+      - pipeline/aggregate_shared.py
+      - data/berlin_trees.duckdb
+    outs:
+      - data/processed/h3_res6.parquet
+      - data/processed/h3_res7.parquet
+      - data/processed/h3_res8.parquet
+      - data/processed/h3_res9.parquet
+      - data/processed/admin_bezirke.parquet
+      - data/processed/admin_ortsteile.parquet
+
+  build_tiles:
+    cmd: python pipeline/build_tiles.py
+    deps:
+      - pipeline/build_tiles.py
+      - data/processed/trees.parquet
+      - data/processed/h3_res6.parquet
+      - data/processed/h3_res7.parquet
+      - data/processed/h3_res8.parquet
+      - data/processed/h3_res9.parquet
+      - data/processed/admin_bezirke.parquet
+      - data/processed/admin_ortsteile.parquet
+      - data/raw/forstbetriebskarte.parquet
+    outs:
+      - web/public/berlin_trees.pmtiles
+      - web/public/dataset_summary.json

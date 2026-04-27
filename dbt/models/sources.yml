@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: main
+    tables:
+      - name: raw_strassenbaeume
+      - name: raw_anlagenbaeume
+      - name: raw_waelder
+      - name: raw_gruen_berlin
+      - name: raw_alkis_ortsteile

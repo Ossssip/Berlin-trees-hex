@@ -1,0 +1,131 @@
+name: Pipeline
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # Every Monday 03:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline/**'
+      - 'dbt/**'
+      - 'data/checksums.json'
+      - '.github/workflows/pipeline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push checksums commit + upload release assets
+  pages: write      # deploy to GitHub Pages
+  id-token: write   # OIDC token for Pages deployment
+
+jobs:
+
+  # ── Job 1: lightweight WFS count check ──────────────────────────────────────
+  check-updates:
+    runs-on: ubuntu-latest
+    outputs:
+      needs_update: ${{ steps.check.outputs.needs_update }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install requests pyyaml
+
+      - name: Check WFS sources
+        id: check
+        run: |
+          set +e
+          python pipeline/check_updates.py
+          CODE=$?
+          set -e
+          if [ $CODE -eq 2 ]; then
+            echo "::error::WFS check returned an error or suspicious count — aborting"
+            exit 2
+          fi
+          echo "needs_update=$([ $CODE -eq 1 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+  # ── Job 2: full pipeline ─────────────────────────────────────────────────────
+  run-pipeline:
+    needs: check-updates
+    if: needs.check-updates.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python deps
+        run: pip install -r requirements-ci.txt
+
+      - name: Install tippecanoe (felt fork)
+        run: |
+          sudo apt-get install -y gcc g++ make libsqlite3-dev zlib1g-dev
+          git clone --depth 1 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          cd /tmp/tippecanoe && make -j$(nproc) && sudo make install
+          tippecanoe --version
+
+      - name: Restore DVC cache
+        uses: actions/cache@v4
+        with:
+          path: .dvc/cache
+          key: dvc-${{ hashFiles('dvc.lock') }}
+          restore-keys: dvc-
+
+      - name: Run pipeline
+        run: dvc repro
+
+      - name: Update checksums
+        run: python pipeline/check_updates.py --update
+
+      - name: Commit checksums and dvc.lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/checksums.json dvc.lock
+          git diff --staged --quiet || git commit -m "chore: update checksums after pipeline run [skip ci]"
+          git push
+
+      - name: Create data-latest release if it does not exist
+        run: |
+          gh release view data-latest 2>/dev/null || gh release create data-latest \
+            --title "Data (latest)" \
+            --notes "PMTiles archive, updated automatically by the weekly pipeline CI run." \
+            --prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload PMTiles to release
+        run: gh release upload data-latest web/public/berlin_trees.pmtiles --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload web/ for deploy job
+        uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: web/
+          retention-days: 1
+
+  # ── Job 3: GitHub Pages deploy ───────────────────────────────────────────────
+  deploy:
+    needs: run-pipeline
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: web/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,54 @@
+ba_code,deuts,genus_latin,notes
+GKI,Gemeine Kiefer,Pinus,
+GBI,Gemeine Birke,Betula,
+Ei,Eiche,Quercus,leading space in source; TRIM before lookup
+TEI,Traubeneiche,Quercus,
+ELA,Europäische Lärche,Larix,
+RBU,Rotbuche,Fagus,
+REI,Roteiche,Quercus,
+RO,Robinie,Robinia,leading space in source; TRIM before lookup
+SEI,Stieleiche,Quercus,
+RER,Roterle,Alnus,
+BAH,Bergahorn,Acer,
+DGS,Douglasie,Pseudotsuga,
+SAH,Spitzahorn,Acer,
+WLI,Winterlinde,Tilia,
+PAS,Pappel,Populus,generic poplar
+BPA,Balsampappel,Populus,
+GES,Gemeine Esche,Fraxinus,
+EAH,Eschenblättriger Ahorn,Acer,
+WKI,Weymouthskiefer,Pinus,
+GFI,Gemeine Fichte,Picea,
+HBU,Hainbuche,Carpinus,
+AS,Aspe,Populus,leading space in source; TRIM before lookup
+Blö,Blöße,,forest clearing — no species; exclude from histogram
+SBW,Baumweiden,Salix,generic willow
+STK,Spätblühende Traubenkirsche,Prunus,
+JLA,Japanische Lärche,Larix,
+GPA,Graupappel,Populus,
+WRU,Flatterrüster,Ulmus,
+BRU,Bergrüster,Ulmus,
+VKB,Vogelkirsche,Prunus,
+WER,Grauerle,Alnus,
+EB,Eberesche,Sorbus,leading space in source; TRIM before lookup
+FIS,sonstige Fichten,Picea,aggregate for other spruce species
+BWE,Bruchweide,Salix,
+ESS,Esche,Fraxinus,duplicate of GES at genus level
+SKI,Schwarzkiefer,Pinus,
+RKA,Roßkastanie,Aesculus,
+SLI,Sommerlinde,Tilia,
+FAH,Feldahorn,Acer,
+KTA,Küstentanne,Abies,
+BIS,Birke,Betula,generic birke
+AHS,Ahorn,Acer,generic ahorn
+KIS,sonstige Kiefern,Pinus,aggregate for other pine species
+NHS,Sonstige Nadelbaumarten,,mixed conifer catch-all — no genus recoverable; exclude from histogram
+EIS,sonstige Eichen,Quercus,aggregate for other oak species
+RUS,Rüster,Ulmus,
+MEH,Mehlbeere,Sorbus,
+SPE,Speierling,Sorbus,
+SPA,Europäische Schwarzpappel,Populus,
+MBI,Moorbirke,Betula,
+EIB,Eibe,Taxus,
+WWE,Silberweide,Salix,
+ELS,Elsbeere,Sorbus,

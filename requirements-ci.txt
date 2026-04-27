@@ -1,0 +1,17 @@
+# Python dependencies for CI (GitHub Actions).
+# Pinned to versions verified against the local berlin_trees conda environment.
+# Update deliberately when upgrading — do not auto-update.
+#
+# tippecanoe v2.80.0 (felt fork, built from source in CI)
+
+geopandas==1.1.3
+pyogrio==0.12.1
+shapely==2.1.2
+pyarrow==24.0.0
+duckdb==1.5.2
+dbt-duckdb==1.11.8
+h3==4.4.2
+requests==2.33.1
+owslib==0.35.0
+PyYAML==6.0.3
+dvc==3.67.1
