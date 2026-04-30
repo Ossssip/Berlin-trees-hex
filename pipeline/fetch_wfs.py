@@ -29,10 +29,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCES_FILE = REPO_ROOT / "pipeline" / "sources.yml"
 RAW_DIR = REPO_ROOT / "data" / "raw"
 
-PAGE_SIZE = 1000  # features per WFS request
-MAX_RETRIES = 5  # attempts per page before giving up
+PAGE_SIZE = 1000           # features per WFS request
+MAX_RETRIES = 5           # attempts per page before giving up
 RETRY_BACKOFF_BASE = 2.0  # exponential backoff base (seconds)
-REQUEST_TIMEOUT = 60  # seconds
+REQUEST_TIMEOUT = 60      # seconds
+CHECKPOINT_INTERVAL = 100_000  # write .partial.parquet every N features
 
 logging.basicConfig(
     level=logging.INFO,
@@ -136,6 +137,8 @@ def fetch_source(source_key: str, max_features: int | None, out_path: Path) -> g
     log.info("URL     : %s", url)
     log.info("Layer   : %s", layer)
 
+    checkpoint_path = out_path.with_suffix(".partial.parquet")
+
     with requests.Session() as session:
         # Step 1: count total features
         log.info("Querying resultType=hits …")
@@ -148,10 +151,20 @@ def fetch_source(source_key: str, max_features: int | None, out_path: Path) -> g
         else:
             fetch_limit = total
 
-        # Step 2: paginate
+        # Step 2: resume from checkpoint if available
         pages: list[gpd.GeoDataFrame] = []
         start = 0
-        page_num = 0
+
+        if checkpoint_path.exists():
+            checkpoint_gdf = gpd.read_parquet(checkpoint_path)
+            if not checkpoint_gdf.empty and len(checkpoint_gdf) < fetch_limit:
+                pages = [checkpoint_gdf]
+                start = len(checkpoint_gdf)
+                log.info("Resuming from checkpoint: %d / %d features", start, fetch_limit)
+
+        # Step 3: paginate
+        next_checkpoint = ((start // CHECKPOINT_INTERVAL) + 1) * CHECKPOINT_INTERVAL
+        page_num = start // PAGE_SIZE
 
         while start < fetch_limit:
             page_count = min(PAGE_SIZE, fetch_limit - start)
@@ -173,6 +186,10 @@ def fetch_source(source_key: str, max_features: int | None, out_path: Path) -> g
             returned = len(page)
             start += returned
 
+            if start >= next_checkpoint:
+                _write_checkpoint(pages, checkpoint_path)
+                next_checkpoint += CHECKPOINT_INTERVAL
+
             # If server returned fewer than requested, we've hit the end
             if returned < page_count:
                 log.info(
@@ -185,7 +202,7 @@ def fetch_source(source_key: str, max_features: int | None, out_path: Path) -> g
     if not pages:
         raise RuntimeError("No features fetched — check URL and layer name.")
 
-    # Step 3: concatenate and set CRS
+    # Step 4: concatenate and set CRS
     log.info("Concatenating %d page(s) …", len(pages))
     gdf = gpd.GeoDataFrame(
         gpd.pd.concat(pages, ignore_index=True),
@@ -200,6 +217,12 @@ def fetch_source(source_key: str, max_features: int | None, out_path: Path) -> g
         gdf = gdf.to_crs(crs)
 
     return gdf
+
+
+def _write_checkpoint(pages: list[gpd.GeoDataFrame], checkpoint_path: Path) -> None:
+    gdf = gpd.GeoDataFrame(gpd.pd.concat(pages, ignore_index=True))
+    gdf.to_parquet(checkpoint_path, index=False)
+    log.info("Checkpoint saved: %d features → %s", len(gdf), checkpoint_path)
 
 
 def print_stats(gdf: gpd.GeoDataFrame, source_key: str) -> None:
@@ -255,6 +278,11 @@ def main() -> None:
     gdf.to_parquet(out_path, index=False)
     size_mb = out_path.stat().st_size / 1024 / 1024
     log.info("Saved: %s  (%.2f MB, %d rows)", out_path, size_mb, len(gdf))
+
+    checkpoint_path = out_path.with_suffix(".partial.parquet")
+    if checkpoint_path.exists():
+        checkpoint_path.unlink()
+        log.info("Checkpoint removed.")
 
 
 if __name__ == "__main__":

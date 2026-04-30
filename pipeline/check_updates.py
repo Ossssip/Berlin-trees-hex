@@ -20,6 +20,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 from datetime import UTC, datetime
@@ -173,6 +174,17 @@ def main() -> None:
     # were skipped via 'continue' above and are not in checksums).
     if args.update and not error_any:
         save_checksums(checksums)
+
+    # ── Emit per-source counts to GitHub Actions step outputs ────────────
+    # Used by CI to key per-source raw-data caches.
+    # Error/suspicious sources fall back to the stored old count so the
+    # cached parquet (if any) is reused rather than triggering a bad fetch.
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as fh:
+            for key in sources:
+                count = checksums.get(key, {}).get("count", 0)
+                fh.write(f"count_{key}={count}\n")
 
     if error_any:
         sys.exit(2)

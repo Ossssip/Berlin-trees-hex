@@ -14,4 +14,3 @@ h3==4.4.2
 requests==2.33.1
 owslib==0.35.0
 PyYAML==6.0.3
-dvc==3.67.1

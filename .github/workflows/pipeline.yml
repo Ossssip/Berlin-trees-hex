@@ -24,6 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       needs_update: ${{ steps.check.outputs.needs_update }}
+      count_alkis_ortsteile: ${{ steps.check.outputs.count_alkis_ortsteile }}
+      count_baumbestand_anlagen: ${{ steps.check.outputs.count_baumbestand_anlagen }}
+      count_baumbestand_strassen: ${{ steps.check.outputs.count_baumbestand_strassen }}
+      count_gruen_berlin: ${{ steps.check.outputs.count_gruen_berlin }}
+      count_forstbetriebskarte: ${{ steps.check.outputs.count_forstbetriebskarte }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,34 +73,169 @@ jobs:
           cd /tmp/tippecanoe && make -j$(nproc) && sudo make install
           tippecanoe --version
 
-      - name: Initialise DVC
-        run: dvc init --no-scm
+      - name: Install pmtiles CLI
+        run: |
+          curl -sL https://github.com/protomaps/go-pmtiles/releases/download/v1.30.2/go-pmtiles_1.30.2_Linux_x86_64.tar.gz \
+            | sudo tar xz -C /usr/local/bin pmtiles
+          pmtiles version
 
-      - name: Restore DVC cache
+      # ── Per-source raw data: restore from cache or fetch fresh ──────────────
+
+      - name: Restore raw — alkis_ortsteile
+        id: cache-alkis
         uses: actions/cache@v4
         with:
-          path: .dvc/cache
-          key: dvc-${{ hashFiles('dvc.lock', 'dvc.yaml') }}
-          restore-keys: dvc-
+          path: data/raw/alkis_ortsteile.parquet
+          key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}
 
-      - name: Run pipeline
-        run: dvc repro
+      - name: Restore checkpoint — alkis_ortsteile
+        if: steps.cache-alkis.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw/alkis_ortsteile.partial.parquet
+          key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-partial
 
-      - name: Save DVC cache
-        if: always()
+      - name: Fetch alkis_ortsteile
+        id: fetch-alkis
+        if: steps.cache-alkis.outputs.cache-hit != 'true'
+        run: python pipeline/fetch_wfs.py --source alkis_ortsteile
+
+      - name: Save checkpoint — alkis_ortsteile
+        if: always() && steps.fetch-alkis.outcome == 'failure'
         uses: actions/cache/save@v4
         with:
-          path: .dvc/cache
-          key: dvc-${{ hashFiles('dvc.lock', 'dvc.yaml') }}
+          path: data/raw/alkis_ortsteile.partial.parquet
+          key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-partial
+
+      - name: Restore raw — baumbestand_anlagen
+        id: cache-anlagen
+        uses: actions/cache@v4
+        with:
+          path: data/raw/baumbestand_anlagen.parquet
+          key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}
+
+      - name: Restore checkpoint — baumbestand_anlagen
+        if: steps.cache-anlagen.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw/baumbestand_anlagen.partial.parquet
+          key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-partial
+
+      - name: Fetch baumbestand_anlagen
+        id: fetch-anlagen
+        if: steps.cache-anlagen.outputs.cache-hit != 'true'
+        run: python pipeline/fetch_wfs.py --source baumbestand_anlagen
+
+      - name: Save checkpoint — baumbestand_anlagen
+        if: always() && steps.fetch-anlagen.outcome == 'failure'
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/baumbestand_anlagen.partial.parquet
+          key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-partial
+
+      - name: Restore raw — baumbestand_strassen
+        id: cache-strassen
+        uses: actions/cache@v4
+        with:
+          path: data/raw/baumbestand_strassen.parquet
+          key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}
+
+      - name: Restore checkpoint — baumbestand_strassen
+        if: steps.cache-strassen.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw/baumbestand_strassen.partial.parquet
+          key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-partial
+
+      - name: Fetch baumbestand_strassen
+        id: fetch-strassen
+        if: steps.cache-strassen.outputs.cache-hit != 'true'
+        run: python pipeline/fetch_wfs.py --source baumbestand_strassen
+
+      - name: Save checkpoint — baumbestand_strassen
+        if: always() && steps.fetch-strassen.outcome == 'failure'
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/baumbestand_strassen.partial.parquet
+          key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-partial
+
+      - name: Restore raw — gruen_berlin
+        id: cache-gruen
+        uses: actions/cache@v4
+        with:
+          path: data/raw/gruen_berlin.parquet
+          key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}
+
+      - name: Restore checkpoint — gruen_berlin
+        if: steps.cache-gruen.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw/gruen_berlin.partial.parquet
+          key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}-partial
+
+      - name: Fetch gruen_berlin
+        id: fetch-gruen
+        if: steps.cache-gruen.outputs.cache-hit != 'true'
+        run: python pipeline/fetch_wfs.py --source gruen_berlin
+
+      - name: Save checkpoint — gruen_berlin
+        if: always() && steps.fetch-gruen.outcome == 'failure'
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/gruen_berlin.partial.parquet
+          key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}-partial
+
+      - name: Restore raw — forstbetriebskarte
+        id: cache-forst
+        uses: actions/cache@v4
+        with:
+          path: data/raw/forstbetriebskarte.parquet
+          key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
+
+      - name: Restore checkpoint — forstbetriebskarte
+        if: steps.cache-forst.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw/forstbetriebskarte.partial.parquet
+          key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-partial
+
+      - name: Fetch forstbetriebskarte
+        id: fetch-forst
+        if: steps.cache-forst.outputs.cache-hit != 'true'
+        run: python pipeline/fetch_wfs.py --source forstbetriebskarte
+
+      - name: Save checkpoint — forstbetriebskarte
+        if: always() && steps.fetch-forst.outcome == 'failure'
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/forstbetriebskarte.partial.parquet
+          key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-partial
+
+      # ── Transform → Aggregate → Build tiles ─────────────────────────────────
+
+      - name: Transform
+        run: |
+          python pipeline/init_db.py
+          dbt run --profiles-dir ./dbt --project-dir ./dbt
+          dbt test --profiles-dir ./dbt --project-dir ./dbt
+          python pipeline/export_trees.py
+
+      - name: Aggregate
+        run: python pipeline/aggregate_all.py
+
+      - name: Build tiles
+        run: python pipeline/build_tiles.py
+
+      # ── Commit, release, deploy ──────────────────────────────────────────────
 
       - name: Update checksums
         run: python pipeline/check_updates.py --update
 
-      - name: Commit checksums and dvc.lock
+      - name: Commit checksums
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/checksums.json dvc.lock
+          git add data/checksums.json
           git diff --staged --quiet || git commit -m "chore: update checksums after pipeline run [skip ci]"
           git push
 
