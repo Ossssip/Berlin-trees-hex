@@ -11,6 +11,11 @@ on:
       - 'data/checksums.json'
       - '.github/workflows/pipeline.yml'
   workflow_dispatch:
+    inputs:
+      force_fetch:
+        description: 'Force re-fetch all WFS sources (ignore cache)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # push checksums commit + upload release assets
@@ -30,9 +35,9 @@ jobs:
       count_gruen_berlin: ${{ steps.check.outputs.count_gruen_berlin }}
       count_forstbetriebskarte: ${{ steps.check.outputs.count_forstbetriebskarte }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -54,12 +59,14 @@ jobs:
   # ── Job 2: full pipeline ─────────────────────────────────────────────────────
   run-pipeline:
     needs: check-updates
-    if: needs.check-updates.outputs.needs_update == 'true'
+    if: needs.check-updates.outputs.needs_update == 'true' || inputs.force_fetch == true
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -83,13 +90,14 @@ jobs:
 
       - name: Restore raw — alkis_ortsteile
         id: cache-alkis
+        if: inputs.force_fetch != true
         uses: actions/cache@v4
         with:
           path: data/raw/alkis_ortsteile.parquet
           key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}
 
       - name: Restore checkpoint — alkis_ortsteile
-        if: steps.cache-alkis.outputs.cache-hit != 'true'
+        if: inputs.force_fetch != true && steps.cache-alkis.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: data/raw/alkis_ortsteile.partial.parquet
@@ -109,13 +117,14 @@ jobs:
 
       - name: Restore raw — baumbestand_anlagen
         id: cache-anlagen
+        if: inputs.force_fetch != true
         uses: actions/cache@v4
         with:
           path: data/raw/baumbestand_anlagen.parquet
           key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}
 
       - name: Restore checkpoint — baumbestand_anlagen
-        if: steps.cache-anlagen.outputs.cache-hit != 'true'
+        if: inputs.force_fetch != true && steps.cache-anlagen.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: data/raw/baumbestand_anlagen.partial.parquet
@@ -135,13 +144,14 @@ jobs:
 
       - name: Restore raw — baumbestand_strassen
         id: cache-strassen
+        if: inputs.force_fetch != true
         uses: actions/cache@v4
         with:
           path: data/raw/baumbestand_strassen.parquet
           key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}
 
       - name: Restore checkpoint — baumbestand_strassen
-        if: steps.cache-strassen.outputs.cache-hit != 'true'
+        if: inputs.force_fetch != true && steps.cache-strassen.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: data/raw/baumbestand_strassen.partial.parquet
@@ -161,13 +171,14 @@ jobs:
 
       - name: Restore raw — gruen_berlin
         id: cache-gruen
+        if: inputs.force_fetch != true
         uses: actions/cache@v4
         with:
           path: data/raw/gruen_berlin.parquet
           key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}
 
       - name: Restore checkpoint — gruen_berlin
-        if: steps.cache-gruen.outputs.cache-hit != 'true'
+        if: inputs.force_fetch != true && steps.cache-gruen.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: data/raw/gruen_berlin.partial.parquet
@@ -187,13 +198,14 @@ jobs:
 
       - name: Restore raw — forstbetriebskarte
         id: cache-forst
+        if: inputs.force_fetch != true
         uses: actions/cache@v4
         with:
           path: data/raw/forstbetriebskarte.parquet
           key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
 
       - name: Restore checkpoint — forstbetriebskarte
-        if: steps.cache-forst.outputs.cache-hit != 'true'
+        if: inputs.force_fetch != true && steps.cache-forst.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: data/raw/forstbetriebskarte.partial.parquet
@@ -237,7 +249,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/checksums.json
           git diff --staged --quiet || git commit -m "chore: update checksums after pipeline run [skip ci]"
-          git pull --rebase origin main
+          git fetch origin main
+          git rebase origin/main
           git push
 
       - name: Create data-latest release if it does not exist
