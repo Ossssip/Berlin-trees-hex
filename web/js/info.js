@@ -21,58 +21,11 @@ let _state = 'idle';          // 'idle' | 'hover' | 'latched'
 let _latchedId = null;        // string ID of the latched feature
 let _expanded = false;        // whether the genus chart is expanded to 10 rows
 let _currentCard = null;      // { props, layerId, type } for re-render on expand
+let _forestEnabled = true;    // mirrors the forest toggle state
 
-// ---------------------------------------------------------------------------
-// Marching-ants dash animation
-// ---------------------------------------------------------------------------
-
-// 10 frames shifting phase by 0.5 units per step through a [3 dash, 2 gap] pattern
-const _DASH_SEQ = [
-  [3, 2],
-  [2.5, 2, 0.5],
-  [2, 2, 1],
-  [1.5, 2, 1.5],
-  [1, 2, 2],
-  [0.5, 2, 2.5],
-  [0, 2, 3],
-  [0, 1.5, 3, 0.5],
-  [0, 1, 3, 1],
-  [0, 0.5, 3, 1.5],
-];
-const _DASH_INTERVAL = 160; // ms per step
-let _animFrame = null;
-let _dashStep = 0;
-let _lastDashTime = 0;
-
-function _setDashArray(da) {
-  if (!_map) return;
-  for (const r of [6, 7, 8, 9]) {
-    try { _map.setPaintProperty(`hexes_res${r}-selected`, 'line-dasharray', da); } catch (_) {}
-  }
-  for (const a of ['bezirke', 'ortsteile']) {
-    try { _map.setPaintProperty(`admin_${a}-selected`, 'line-dasharray', da); } catch (_) {}
-  }
-}
-
-function _animateDash(ts) {
-  if (ts - _lastDashTime >= _DASH_INTERVAL) {
-    _dashStep = (_dashStep + 1) % _DASH_SEQ.length;
-    _lastDashTime = ts;
-    _setDashArray(_DASH_SEQ[_dashStep]);
-  }
-  _animFrame = requestAnimationFrame(_animateDash);
-}
-
-function _startDashAnim() {
-  if (_animFrame) return;
-  _dashStep = 0;
-  _lastDashTime = 0;
-  _animFrame = requestAnimationFrame(_animateDash);
-}
-
-function _stopDashAnim() {
-  if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
-  _setDashArray([3, 2]);
+export function setForestEnabled(enabled) {
+  _forestEnabled = enabled;
+  if (_currentCard) _renderCurrentCard();
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +64,44 @@ export function updateColorbar(mode) {
 }
 
 function _fmt(n) { return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n); }
+
+// ---------------------------------------------------------------------------
+// Info card state attribute (used by CSS for mobile visibility)
+// ---------------------------------------------------------------------------
+
+function _setInfoState(s) {
+  document.getElementById('ctrl-info')?.setAttribute('data-state', s);
+  document.getElementById('ctrl-colorbar')?.setAttribute('data-state', s);
+}
+
+// ---------------------------------------------------------------------------
+// Hover highlight
+// ---------------------------------------------------------------------------
+
+function _clearHoverHighlight() {
+  if (!_map) return;
+  for (const r of [6, 7, 8, 9]) {
+    try { _map.setFilter(`hexes_res${r}-hover`, ['==', ['get', 'h3_index_str'], '']); } catch (_) {}
+  }
+  for (const a of ['bezirke', 'ortsteile']) {
+    try { _map.setFilter(`admin_${a}-hover`, ['==', ['get', 'area_id'], -1]); } catch (_) {}
+  }
+}
+
+function _highlightHover(layerId, props) {
+  _clearHoverHighlight();
+  if (!_map) return;
+  if (layerId.startsWith('hexes_res')) {
+    const h3 = props.h3_index_str ?? '';
+    for (const r of [6, 7, 8, 9]) {
+      try { _map.setFilter(`hexes_res${r}-hover`, ['==', ['get', 'h3_index_str'], h3]); } catch (_) {}
+    }
+  } else if (layerId === 'admin_bezirke-fill') {
+    try { _map.setFilter('admin_bezirke-hover', ['==', ['get', 'area_id'], props.area_id]); } catch (_) {}
+  } else if (layerId === 'admin_ortsteile-fill') {
+    try { _map.setFilter('admin_ortsteile-hover', ['==', ['get', 'area_id'], props.area_id]); } catch (_) {}
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Icon / letter fallback
@@ -182,13 +173,6 @@ function renderTreeChart(props, phylopicIndex, maxRows) {
         <div class="bar-pct">${Number(otherShare).toFixed(1)}%<span class="bar-count">${otherCount.toLocaleString()}</span></div>
        </div>` : '';
 
-  // Count how many extra genera exist beyond maxRows
-  let extraCount = 0;
-  for (let i = maxRows + 1; i <= 10; i++) {
-    if (!props[`tree_genus_${i}`]) break;
-    extraCount++;
-  }
-
   return `<div class="card-section"><div class="card-section-title">Tree genera</div>${rows.join('')}${otherRow}</div>`;
 }
 
@@ -248,13 +232,17 @@ function renderHexCard(props, layerType, phylopicIndex, expanded, latched) {
     props.berlin_area_km2 ? `${Number(props.berlin_area_km2).toFixed(2)} km²` : null,
   ].filter(Boolean);
 
-  // Count extra genera beyond 5 to label the expand button
-  let extraCount = 0;
-  for (let i = 6; i <= 10; i++) {
+  // Count how many genera slots are populated (1–10)
+  let totalGenera = 0;
+  for (let i = 1; i <= 10; i++) {
     if (!props[`tree_genus_${i}`]) break;
-    extraCount++;
+    totalGenera++;
   }
-  const expandBtn = latched && extraCount > 0
+  const moreThan10 = totalGenera === 10 && Number(props.tree_genus_other_share ?? 0) > 0.5;
+
+  // Show expand control only when there are more than 5 genera
+  const hasMore = totalGenera > 5;
+  const expandBtn = latched && hasMore
     ? `<button class="expand-btn">${expanded ? 'less ↑' : 'more ↓'}</button>`
     : '';
 
@@ -262,11 +250,15 @@ function renderHexCard(props, layerType, phylopicIndex, expanded, latched) {
     ? `<div class="card-header"><div class="card-title">${props.area_name}</div>${expandBtn}</div>`
     : expandBtn ? `<div class="card-header card-header-end">${expandBtn}</div>` : '';
 
-  const maxRows = expanded ? 10 : 5;
+  // maxRows: ≤5 genera → show all; short → 4+other; expanded → all or 9+other if >10
+  const maxRows = !hasMore ? totalGenera
+    : !expanded ? 4
+    : moreThan10 ? 9 : totalGenera;
+
   return `${header}
     <div class="card-stats">${stats.map(s => `<span>${s}</span>`).join('')}</div>
     ${renderTreeChart(props, phylopicIndex, maxRows)}
-    ${renderForestChart(props, phylopicIndex)}`;
+    ${_forestEnabled ? renderForestChart(props, phylopicIndex) : ''}`;
 }
 
 function renderTreePointCard(props, phylopicIndex) {
@@ -302,6 +294,7 @@ function _clearAllSelections() {
   }
   const src = _map.getSource('selected-tree');
   if (src) src.setData({ type: 'FeatureCollection', features: [] });
+  _clearHoverHighlight();
 }
 
 function _highlightFeature(layerId, props, feature) {
@@ -334,15 +327,42 @@ function _layerType(layerId) {
   return 'unknown';
 }
 
-function showCard(html) {
+function showCard(html, { showClose = false } = {}) {
   const el = document.getElementById('ctrl-info');
-  if (el) el.innerHTML = html;
+  if (!el) return;
+  el.innerHTML = html;
+  if (showClose) {
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-btn';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '✕';
+
+    const expandBtn = el.querySelector('.expand-btn');
+    if (expandBtn) {
+      // Keep expand + close always adjacent regardless of title width
+      const controls = document.createElement('div');
+      controls.className = 'card-controls';
+      expandBtn.parentNode.insertBefore(controls, expandBtn);
+      controls.appendChild(expandBtn);
+      controls.appendChild(closeBtn);
+    } else {
+      const header = el.querySelector('.card-header');
+      if (header) {
+        header.appendChild(closeBtn);
+      } else {
+        const div = document.createElement('div');
+        div.className = 'card-header card-header-end';
+        div.appendChild(closeBtn);
+        el.insertBefore(div, el.firstChild);
+      }
+    }
+  }
 }
 
 function showIdle() {
   _state = 'idle';
   _currentCard = null;
-  _stopDashAnim();
+  _setInfoState('idle');
   showCard(renderDatasetCard(_summary, _getPhylopicIndex?.() ?? {}));
 }
 
@@ -351,7 +371,7 @@ export function restoreLatched(layerId, props, type) {
   _latchedId = _featureId(props);
   _currentCard = { props, layerId, type };
   _highlightFeature(layerId, props, null);
-  _startDashAnim();
+  _setInfoState('latched');
   _renderCurrentCard();
 }
 
@@ -361,7 +381,6 @@ export function clearSelection() {
   _currentCard = null;
   _state = 'idle';
   _clearAllSelections();
-  _stopDashAnim();
   showIdle();
 }
 
@@ -373,9 +392,10 @@ function _renderCurrentCard() {
   if (!_currentCard) return;
   const { props, type } = _currentCard;
   const phi = _getPhylopicIndex?.() ?? {};
-  showCard(type === 'tree'
-    ? renderTreePointCard(props, phi)
-    : renderHexCard(props, type, phi, _expanded, true));
+  showCard(
+    type === 'tree' ? renderTreePointCard(props, phi) : renderHexCard(props, type, phi, _expanded, true),
+    { showClose: true },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -397,6 +417,7 @@ export function setupInfoCard(map, getPhylopicIndex, tilesRawUrl, { onLatchChang
 
   showCard('<div class="card-loading">Loading…</div>');
 
+  _setInfoState('idle');
   loadSummary(tilesRawUrl).then((summary) => {
     _summary = summary;
     _densityRanges = summary?.density_ranges ?? null;
@@ -417,6 +438,8 @@ export function setupInfoCard(map, getPhylopicIndex, tilesRawUrl, { onLatchChang
       const type = _layerType(layerId);
       _state = 'hover';
       _currentCard = { props, layerId, type };
+      _highlightHover(layerId, props);
+      _setInfoState('hover');
       showCard(type === 'tree'
         ? renderTreePointCard(props, _getPhylopicIndex?.() ?? {})
         : renderHexCard(props, type, _getPhylopicIndex?.() ?? {}, _expanded, true));
@@ -425,6 +448,7 @@ export function setupInfoCard(map, getPhylopicIndex, tilesRawUrl, { onLatchChang
     map.on('mouseleave', layerId, () => {
       if (_state === 'latched') return;
       map.getCanvas().style.cursor = '';
+      _clearHoverHighlight();
       showIdle();
     });
 
@@ -440,15 +464,15 @@ export function setupInfoCard(map, getPhylopicIndex, tilesRawUrl, { onLatchChang
         _currentCard = null;
         _state = 'idle';
         _clearAllSelections();
-        _stopDashAnim();
         onLatchChange?.(null);
         showIdle();
       } else {
         _state = 'latched';
         _latchedId = id;
         _currentCard = { props, layerId, type };
+        _clearHoverHighlight();
         _highlightFeature(layerId, props, feature);
-        _startDashAnim();
+        _setInfoState('latched');
         onLatchChange?.({ layerId, props, type });
         _renderCurrentCard();
       }
@@ -464,7 +488,6 @@ export function setupInfoCard(map, getPhylopicIndex, tilesRawUrl, { onLatchChang
       _currentCard = null;
       _state = 'idle';
       _clearAllSelections();
-      _stopDashAnim();
       onLatchChange?.(null);
       showIdle();
     }
@@ -472,6 +495,15 @@ export function setupInfoCard(map, getPhylopicIndex, tilesRawUrl, { onLatchChang
 
   // Expand/collapse button — delegate from info card container
   document.getElementById('ctrl-info')?.addEventListener('click', (e) => {
+    if (e.target.classList.contains('close-btn')) {
+      _latchedId = null;
+      _currentCard = null;
+      _state = 'idle';
+      _clearAllSelections();
+      onLatchChange?.(null);
+      showIdle();
+      return;
+    }
     if (!e.target.classList.contains('expand-btn')) return;
     _expanded = !_expanded;
     if (_currentCard) _renderCurrentCard();

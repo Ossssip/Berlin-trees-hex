@@ -20,6 +20,12 @@
   <div id="ctrl-detail" class="map-overlay">
     <div id="ctrl-detail-header">
       <span class="seg-title">Detail level</span>
+      <div id="detail-header-end">
+        <button class="seg-btn auto-btn" id="btn-auto" data-mode="auto" aria-pressed="false">
+          <span class="seg-label">Auto</span>
+        </button>
+        <button class="expand-btn" id="btn-detail-expand" aria-expanded="false">more ↓</button>
+      </div>
     </div>
 
     <div id="ctrl-detail-main">
@@ -27,81 +33,82 @@
         <div id="seg-hex-highlight"></div>
         <div class="seg-thumb" id="seg-thumb"></div>
 
-        <button class="seg-btn" data-mode="bezirke">
-          <div class="seg-btn-inner">
-            <svg viewBox="0 0 22 18" width="22" height="18" style="display:block">
-              <path class="seg-admin-path" d="M17.29,7.81L17.75,7.80L18.23,8.75L18.38,8.80L18.05,9.15L17.90,9.61L19.60,9.99L21.50,10.71L21.34,10.79L21.96,11.06L21.83,11.34L21.57,11.32L21.40,11.55L21.54,11.62L20.86,12.61L22.00,13.24L21.62,13.74L20.91,13.86L20.28,13.74L19.97,14.00L19.51,13.87L19.36,14.02L18.92,13.87L18.66,13.52L18.32,13.65L17.85,13.30L17.70,13.38L16.98,13.10L16.81,13.32L13.32,13.52L13.10,13.34L12.64,14.13L12.40,14.00L11.66,14.94L10.50,14.77L6.46,13.84L6.38,13.70L5.59,13.59L5.70,13.21L4.91,12.98L5.59,12.70L4.99,12.51L5.91,12.43L5.95,12.24L5.62,11.83L5.22,11.82L4.84,11.63L4.77,10.96L4.12,10.53L3.27,10.53L3.00,10.74L2.97,11.08L2.80,11.21L2.60,11.11L2.03,9.51L2.62,9.40L2.75,9.14L1.98,9.23L1.70,8.59L4.75,8.14L4.41,7.89L4.44,7.59L2.82,6.41L0.00,6.32L1.40,4.78L4.02,4.26L4.35,3.98L5.21,4.11L6.12,3.62L8.18,4.06L10.01,4.07L10.08,4.31L10.84,4.19L10.94,4.71L11.20,4.70L11.92,4.30L13.01,4.28L13.26,3.33L14.24,3.06L14.99,3.07L15.80,3.63L16.29,4.17L16.61,5.63L16.40,5.99L16.75,5.96L16.99,6.69L16.80,6.71L16.98,7.25L17.29,7.81Z"/>
+        <div id="seg-admin-row">
+          <button class="seg-btn" data-mode="bezirke">
+            <div class="seg-btn-inner">
+              <svg viewBox="0 0 22 18" width="22" height="18" style="display:block">
+                <path class="seg-admin-path" d="M17.29,7.81L17.75,7.80L18.23,8.75L18.38,8.80L18.05,9.15L17.90,9.61L19.60,9.99L21.50,10.71L21.34,10.79L21.96,11.06L21.83,11.34L21.57,11.32L21.40,11.55L21.54,11.62L20.86,12.61L22.00,13.24L21.62,13.74L20.91,13.86L20.28,13.74L19.97,14.00L19.51,13.87L19.36,14.02L18.92,13.87L18.66,13.52L18.32,13.65L17.85,13.30L17.70,13.38L16.98,13.10L16.81,13.32L13.32,13.52L13.10,13.34L12.64,14.13L12.40,14.00L11.66,14.94L10.50,14.77L6.46,13.84L6.38,13.70L5.59,13.59L5.70,13.21L4.91,12.98L5.59,12.70L4.99,12.51L5.91,12.43L5.95,12.24L5.62,11.83L5.22,11.82L4.84,11.63L4.77,10.96L4.12,10.53L3.27,10.53L3.00,10.74L2.97,11.08L2.80,11.21L2.60,11.11L2.03,9.51L2.62,9.40L2.75,9.14L1.98,9.23L1.70,8.59L4.75,8.14L4.41,7.89L4.44,7.59L2.82,6.41L0.00,6.32L1.40,4.78L4.02,4.26L4.35,3.98L5.21,4.11L6.12,3.62L8.18,4.06L10.01,4.07L10.08,4.31L10.84,4.19L10.94,4.71L11.20,4.70L11.92,4.30L13.01,4.28L13.26,3.33L14.24,3.06L14.99,3.07L15.80,3.63L16.29,4.17L16.61,5.63L16.40,5.99L16.75,5.96L16.99,6.69L16.80,6.71L16.98,7.25L17.29,7.81Z"/>
+              </svg>
+              <span class="seg-sublabel">Bezirk</span>
+            </div>
+          </button>
+          <button class="seg-btn" data-mode="ortsteile">
+            <div class="seg-btn-inner">
+              <svg viewBox="0 0 22 18" width="22" height="18" style="display:block">
+                <path class="seg-admin-path" d="M20.86,3.81L19.88,3.45L18.72,3.51L17.19,4.54L14.96,5.19L13.76,5.83L12.54,6.06L11.49,5.97L9.42,4.91L8.43,4.84L7.99,5.13L7.94,5.72L7.24,5.77L7.31,5.52L7.09,5.47L6.63,5.57L6.75,5.96L6.52,5.98L6.59,6.24L6.30,6.38L7.20,6.47L6.47,6.56L6.49,6.67L6.04,6.76L6.07,6.98L5.62,7.02L5.63,6.79L4.06,6.79L3.82,6.97L4.26,6.95L4.31,7.22L3.69,7.16L3.72,7.52L2.76,7.58L2.69,7.81L0.24,8.02L0.53,8.27L1.84,8.54L1.25,8.88L0.00,9.30L2.13,9.90L2.22,10.18L1.71,10.85L2.51,11.25L3.97,11.22L4.17,11.61L4.80,11.59L7.77,12.27L15.02,14.11L18.15,14.55L18.86,14.00L19.10,13.23L20.13,12.03L20.50,12.39L20.77,12.39L22.00,10.27L21.41,9.79L21.56,8.05L21.87,6.73L21.53,6.42L21.79,6.18L21.63,5.64L21.64,4.88L21.35,4.65L21.20,4.14L20.86,3.81Z"/>
+              </svg>
+              <span class="seg-sublabel">Ortsteil</span>
+            </div>
+          </button>
+          <button id="btn-forest-toggle" class="forest-toggle-btn active" title="Toggle forests" aria-pressed="true">
+            <svg viewBox="0 0 22 18" width="22" height="18" style="display:block" aria-hidden="true">
+              <defs><clipPath id="fp-clip">
+                <path d="M7,1 L13,1 L18,4 L20,9 L19,14 L14,17 L8,17 L4,14 L2,9 L3,4Z"/>
+              </clipPath></defs>
+              <path d="M7,1 L13,1 L18,4 L20,9 L19,14 L14,17 L8,17 L4,14 L2,9 L3,4Z"
+                    fill="none" stroke="currentColor" stroke-width="1.3"/>
+              <g clip-path="url(#fp-clip)" stroke="currentColor" stroke-width="1.1" opacity="0.75">
+                <line x1="-3" y1="5"  x2="11" y2="19"/>
+                <line x1="2"  y1="0"  x2="16" y2="14"/>
+                <line x1="7"  y1="0"  x2="21" y2="14"/>
+                <line x1="12" y1="0"  x2="26" y2="14"/>
+                <line x1="17" y1="0"  x2="31" y2="14"/>
+              </g>
             </svg>
-            <span class="seg-sublabel">Bezirk</span>
-          </div>
-        </button>
-        <button class="seg-btn" data-mode="ortsteile">
-          <div class="seg-btn-inner">
-            <svg viewBox="0 0 22 18" width="22" height="18" style="display:block">
-              <path class="seg-admin-path" d="M20.86,3.81L19.88,3.45L18.72,3.51L17.19,4.54L14.96,5.19L13.76,5.83L12.54,6.06L11.49,5.97L9.42,4.91L8.43,4.84L7.99,5.13L7.94,5.72L7.24,5.77L7.31,5.52L7.09,5.47L6.63,5.57L6.75,5.96L6.52,5.98L6.59,6.24L6.30,6.38L7.20,6.47L6.47,6.56L6.49,6.67L6.04,6.76L6.07,6.98L5.62,7.02L5.63,6.79L4.06,6.79L3.82,6.97L4.26,6.95L4.31,7.22L3.69,7.16L3.72,7.52L2.76,7.58L2.69,7.81L0.24,8.02L0.53,8.27L1.84,8.54L1.25,8.88L0.00,9.30L2.13,9.90L2.22,10.18L1.71,10.85L2.51,11.25L3.97,11.22L4.17,11.61L4.80,11.59L7.77,12.27L15.02,14.11L18.15,14.55L18.86,14.00L19.10,13.23L20.13,12.03L20.50,12.39L20.77,12.39L22.00,10.27L21.41,9.79L21.56,8.05L21.87,6.73L21.53,6.42L21.79,6.18L21.63,5.64L21.64,4.88L21.35,4.65L21.20,4.14L20.86,3.81Z"/>
-            </svg>
-            <span class="seg-sublabel">Ortsteil</span>
-          </div>
-        </button>
+            <span class="forest-toggle-label">Forests</span>
+          </button>
+        </div>
 
-        <button class="seg-btn" data-mode="6">
-          <div class="seg-btn-inner"><span class="seg-hex" style="font-size:20px"></span><span class="seg-sublabel">~36 km²</span></div>
-        </button>
-        <button class="seg-btn" data-mode="7">
-          <div class="seg-btn-inner"><span class="seg-hex" style="font-size:15px"></span><span class="seg-sublabel">~5 km²</span></div>
-        </button>
-        <button class="seg-btn" data-mode="8">
-          <div class="seg-btn-inner"><span class="seg-hex" style="font-size:11px"></span><span class="seg-sublabel">~0.7 km²</span></div>
-        </button>
-        <button class="seg-btn" data-mode="9">
-          <div class="seg-btn-inner"><span class="seg-hex" style="font-size:8px"></span><span class="seg-sublabel">~0.1 km²</span></div>
-        </button>
-        <button class="seg-btn" data-mode="trees">
-          <div class="seg-btn-inner"><span style="font-size:10px">●</span><span class="seg-sublabel">Tree</span></div>
-        </button>
+        <div id="seg-hex-row">
+          <button class="seg-btn" data-mode="6">
+            <div class="seg-btn-inner"><span class="seg-hex" style="font-size:20px"></span><span class="seg-sublabel">~36 km²</span></div>
+          </button>
+          <button class="seg-btn" data-mode="7">
+            <div class="seg-btn-inner"><span class="seg-hex" style="font-size:15px"></span><span class="seg-sublabel">~5 km²</span></div>
+          </button>
+          <button class="seg-btn" data-mode="8">
+            <div class="seg-btn-inner"><span class="seg-hex" style="font-size:11px"></span><span class="seg-sublabel">~0.7 km²</span></div>
+          </button>
+          <button class="seg-btn" data-mode="9">
+            <div class="seg-btn-inner"><span class="seg-hex" style="font-size:8px"></span><span class="seg-sublabel">~0.1 km²</span></div>
+          </button>
+          <button class="seg-btn" data-mode="trees">
+            <div class="seg-btn-inner"><span style="font-size:10px">●</span><span class="seg-sublabel">Tree</span></div>
+          </button>
+        </div>
       </div>
 
-      <button id="btn-forest-toggle" class="forest-toggle-btn active" title="Toggle forests" aria-pressed="true">
-        <svg viewBox="0 0 22 18" width="22" height="18" style="display:block" aria-hidden="true">
-          <defs><clipPath id="fp-clip">
-            <path d="M7,1 L13,1 L18,4 L20,9 L19,14 L14,17 L8,17 L4,14 L2,9 L3,4Z"/>
-          </clipPath></defs>
-          <path d="M7,1 L13,1 L18,4 L20,9 L19,14 L14,17 L8,17 L4,14 L2,9 L3,4Z"
-                fill="none" stroke="currentColor" stroke-width="1.3"/>
-          <g clip-path="url(#fp-clip)" stroke="currentColor" stroke-width="1.1" opacity="0.75">
-            <line x1="-3" y1="5"  x2="11" y2="19"/>
-            <line x1="2"  y1="0"  x2="16" y2="14"/>
-            <line x1="7"  y1="0"  x2="21" y2="14"/>
-            <line x1="12" y1="0"  x2="26" y2="14"/>
-            <line x1="17" y1="0"  x2="31" y2="14"/>
-          </g>
-        </svg>
-        <span class="forest-toggle-label">Forests</span>
-      </button>
     </div>
 
-    <div id="ctrl-detail-auto">
-      <button class="seg-btn auto-btn" id="btn-auto" data-mode="auto" aria-pressed="false">
-        <span class="seg-label">Auto</span>
-      </button>
-    </div>
   </div>
 
-  <!-- Density colorbar -->
-  <div id="ctrl-colorbar" class="map-overlay">
-    <div class="cb-label">Tree density (trees/km²)</div>
-    <div class="cb-bar"></div>
-    <div class="cb-ticks">
-      <div class="cb-tick"><span>0</span></div>
-      <div class="cb-tick"><span>—</span></div>
-      <div class="cb-tick"><span>—</span></div>
-      <div class="cb-tick"><span>—</span></div>
+  <div id="card-stack">
+    <!-- Density colorbar -->
+    <div id="ctrl-colorbar" class="map-overlay">
+      <div class="cb-label">Tree density (trees/km²)</div>
+      <div class="cb-bar"></div>
+      <div class="cb-ticks">
+        <div class="cb-tick"><span>0</span></div>
+        <div class="cb-tick"><span>—</span></div>
+        <div class="cb-tick"><span>—</span></div>
+        <div class="cb-tick"><span>—</span></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Info card -->
-  <div id="ctrl-info" class="map-overlay">
-    <div class="card-loading">Loading…</div>
+    <!-- Info card -->
+    <div id="ctrl-info" class="map-overlay">
+      <div class="card-loading">Loading…</div>
+    </div>
   </div>
 
 

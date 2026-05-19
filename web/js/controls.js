@@ -50,26 +50,27 @@ export function setupControls(map, setActiveMode, getActiveMode, onModeChange, i
     onModeChange?.('auto');
   });
 
-  // Position auto button centred under hex+trees section
+  // Position and reveal the hex-block highlight and auto button
   requestAnimationFrame(() => {
     const h6Btn    = track.querySelector('[data-mode="6"]');
     const treesBtn = track.querySelector('[data-mode="trees"]');
     const highlight = document.getElementById('seg-hex-highlight');
-    const autoRow   = document.getElementById('ctrl-detail-auto');
     const autoBtn   = document.getElementById('btn-auto');
+    const header    = document.getElementById('ctrl-detail-header');
 
-    if (h6Btn && treesBtn && highlight && autoRow && autoBtn) {
+    if (h6Btn && treesBtn && highlight) {
       const highlightPad = 3;
       highlight.style.left  = `${h6Btn.offsetLeft - highlightPad}px`;
       highlight.style.width = `${(treesBtn.offsetLeft + treesBtn.offsetWidth) - h6Btn.offsetLeft + highlightPad * 2}px`;
+      highlight.style.opacity = '1';
+    }
 
+    if (h6Btn && treesBtn && autoBtn && header) {
       const h6Rect    = h6Btn.getBoundingClientRect();
       const treesRect = treesBtn.getBoundingClientRect();
-      const hexTreesMidX = (h6Rect.left + treesRect.right) / 2;
-      const autoRowRect = autoRow.getBoundingClientRect();
-      const paddingLeft = hexTreesMidX - autoRowRect.left - autoBtn.offsetWidth / 2;
-      autoRow.style.paddingLeft = `${Math.max(0, paddingLeft)}px`;
-      autoRow.classList.add('ready');
+      const hexMidX   = (h6Rect.left + treesRect.right) / 2;
+      autoBtn.style.left    = `${hexMidX - header.getBoundingClientRect().left}px`;
+      autoBtn.style.opacity = '1';
     }
 
     const startMode = initialState.mode ?? 'auto';
@@ -86,6 +87,14 @@ export function setupControls(map, setActiveMode, getActiveMode, onModeChange, i
     refreshForests(map);
   }
   _onForestChange = initialState.onForestChange ?? null;
+
+  // Detail expand/collapse (mobile only — button is display:none on desktop)
+  document.getElementById('btn-detail-expand')?.addEventListener('click', () => {
+    const detailEl = document.getElementById('ctrl-detail');
+    const expanded = detailEl.classList.toggle('detail-expanded');
+    document.getElementById('btn-detail-expand').textContent = expanded ? 'less ↑' : 'more ↓';
+    document.getElementById('btn-detail-expand').setAttribute('aria-expanded', String(expanded));
+  });
 
   // Forest master toggle
   document.getElementById('btn-forest-toggle').addEventListener('click', () => {

@@ -1,8 +1,8 @@
 import { setupControls } from './controls.js';
 import { registerMissingImagePlaceholder, loadPhylopicIcons, loadPhylopicIndex } from './icons.js';
-import { addMapLayers } from './layers.js';
+import { addMapLayers, updateGenusLabelFilter } from './layers.js';
 import { createModeController } from './mode.js';
-import { setupInfoCard, updateColorbar, clearSelection, restoreLatched } from './info.js';
+import { setupInfoCard, updateColorbar, clearSelection, restoreLatched, setForestEnabled } from './info.js';
 import { loadState, saveState } from './mapState.js';
 
 const protocol = new pmtiles.Protocol();
@@ -42,7 +42,10 @@ map.on('load', () => {
   loadPhylopicIndex()
     .then((index) => {
       phylopicIndex = index;
-      return loadPhylopicIcons(map, index);
+      return loadPhylopicIcons(map, index).then(() => {
+        const withIcon = Object.keys(index).filter(g => index[g] !== null);
+        updateGenusLabelFilter(map, withIcon);
+      });
     })
     .catch(() => {});
 
@@ -51,6 +54,7 @@ map.on('load', () => {
   setupInfoCard(map, getPhylopicIndex, tilesRawUrl, {
     onLatchChange: (latchState) => saveState({ latched: latchState }),
   });
+  if (_saved.forestEnabled === false) setForestEnabled(false);
 
   // onModeChange: update colorbar and density colour scale when user switches modes.
   function onModeChange(mode) {
@@ -62,7 +66,7 @@ map.on('load', () => {
   setupControls(map, setActiveMode, getActiveMode, onModeChange, {
     mode: _saved.mode,
     forestEnabled: _saved.forestEnabled,
-    onForestChange: (enabled) => saveState({ forestEnabled: enabled }),
+    onForestChange: (enabled) => { saveState({ forestEnabled: enabled }); setForestEnabled(enabled); },
   });
 
   // Save position on every pan/zoom end

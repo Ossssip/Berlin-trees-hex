@@ -17,11 +17,11 @@ export const ADMIN_ICON_SIZES = {
 };
 
 export const RES_LAYERS = {
-  bezirke: ['admin_bezirke-fill', 'admin_bezirke-outline', 'admin_bezirke-icon'],
-  ortsteile: ['admin_ortsteile-fill', 'admin_ortsteile-outline', 'admin_ortsteile-icon'],
-  6: ['hexes_res6-fill', 'hexes_res6-outline', 'hexes_res6-icon-trees', 'hexes_res6-icon-forest'],
-  7: ['hexes_res7-fill', 'hexes_res7-outline', 'hexes_res7-icon-trees', 'hexes_res7-icon-forest'],
-  8: ['hexes_res8-fill', 'hexes_res8-outline', 'hexes_res8-icon-trees', 'hexes_res8-icon-forest'],
-  9: ['hexes_res9-fill', 'hexes_res9-outline', 'hexes_res9-icon-trees', 'hexes_res9-icon-forest'],
+  bezirke:   ['admin_bezirke-fill', 'admin_bezirke-outline', 'admin_bezirke-label', 'admin_bezirke-icon'],
+  ortsteile: ['admin_ortsteile-fill', 'admin_ortsteile-outline', 'admin_ortsteile-label', 'admin_ortsteile-icon'],
+  6: ['hexes_res6-fill', 'hexes_res6-outline', 'hexes_res6-label-genus', 'hexes_res6-icon-trees', 'hexes_res6-icon-forest'],
+  7: ['hexes_res7-fill', 'hexes_res7-outline', 'hexes_res7-label-genus', 'hexes_res7-icon-trees', 'hexes_res7-icon-forest'],
+  8: ['hexes_res8-fill', 'hexes_res8-outline', 'hexes_res8-label-genus', 'hexes_res8-icon-trees', 'hexes_res8-icon-forest'],
+  9: ['hexes_res9-fill', 'hexes_res9-outline', 'hexes_res9-label-genus', 'hexes_res9-icon-trees', 'hexes_res9-icon-forest'],
   trees: ['trees-circle'],
 };

@@ -32,6 +32,9 @@ body { font-family: sans-serif; }
 #ctrl-colorbar,
 #ctrl-info { width: 300px; }
 
+/* Wrapper is transparent on desktop; on mobile it becomes a sized column */
+#card-stack { display: contents; }
+
 /* ---- Detail level control ---- */
 #ctrl-detail {
   padding: 7px 7px 5px 8px;
@@ -46,9 +49,15 @@ body { font-family: sans-serif; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  position: relative;
 }
 
 #ctrl-detail-header .seg-title { margin-bottom: 0; font-size: 14px; }
+
+/* On desktop the wrapper is invisible — auto btn keeps its absolute positioning */
+#detail-header-end { display: contents; }
+/* Detail expand button is mobile-only */
+#btn-detail-expand { display: none; }
 
 #ctrl-detail-main {
   display: flex;
@@ -56,24 +65,19 @@ body { font-family: sans-serif; }
   gap: 4px;
 }
 
-#ctrl-detail-auto {
-  display: flex;
-  justify-content: flex-start;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease;
-}
-#ctrl-detail-auto.ready { opacity: 1; visibility: visible; }
-
 #btn-auto.auto-btn {
-  min-width: 92px;
-  justify-content: center;
-  padding: 7px 14px;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: color 0.18s, background 0.18s, border-color 0.18s, opacity 0.12s ease;
+  padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   color: #9a9a9a;
-  transition: color 0.18s, background 0.18s, border-color 0.18s;
+  font-size: 13px;
+  white-space: nowrap;
 }
 #btn-auto.auto-btn:hover { color: #e8e8e8; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
 #btn-auto.auto-btn.active { color: #fff; background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.22); }
@@ -86,6 +90,8 @@ body { font-family: sans-serif; }
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
 }
 
 .seg-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.12); flex-shrink: 0; margin: 0 1px; }
@@ -100,7 +106,7 @@ body { font-family: sans-serif; }
   cursor: pointer;
   color: #555;
   padding: 6px 9px;
-  border-radius: 999px;
+  border-radius: 8px;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
   flex-shrink: 0;
 }
@@ -312,8 +318,19 @@ body { font-family: sans-serif; }
   font-family: sans-serif;
 }
 
-.expand-btn {
+.card-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+}
+
+.expand-btn,
+.close-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 999px;
@@ -324,8 +341,114 @@ body { font-family: sans-serif; }
   transition: color 0.15s, background 0.15s;
   white-space: nowrap;
 }
-.expand-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
+.expand-btn:hover,
+.close-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
 
 .card-loading { font-size: 12px; color: #666; padding: 4px 0; }
 
+/* ---- Row wrappers: transparent to flex on desktop ---- */
+#seg-admin-row,
+#seg-hex-row { display: contents; }
+
+/* ---- Forest toggle inside seg-track (desktop) ---- */
+/* Push to end of the flex row: bezirk → ortsteil → hex block → forests */
+#btn-forest-toggle {
+  order: 10;
+  margin-left: 5px;
+}
+
+/* Small gap between admin and hex blocks on desktop */
+#seg-hex-row > .seg-btn:first-child { margin-left: 5px; }
+
+/* ---- Mobile layout (≤600px) ---- */
+@media (max-width: 600px) {
+  /* Panel doesn't scroll itself */
+  #right-panel { overflow-y: visible; }
+
+  /* Card-stack: column of colorbar + info card; width driven by info card content */
+  #card-stack { display: flex; flex-direction: column; gap: 6px; }
+  /* Info card: size to content (stats line is the dominant row); colorbar matches */
+  #ctrl-info { width: max-content; }
+  #ctrl-colorbar { width: 100%; }
+  /* Long admin names shouldn't blow up the width — let them wrap */
+  .card-title { max-width: 200px; }
+
+  /* Header: title left, auto+expand right */
+  #ctrl-detail-header { justify-content: space-between; }
+  #detail-header-end {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Auto button: reset absolute positioning, always visible */
+  #btn-auto.auto-btn {
+    position: static;
+    transform: none;
+    opacity: 1;
+  }
+
+  /* Show the expand button; match font size to the Auto button label */
+  #btn-detail-expand { display: inline-flex; font-size: 13px; }
+  #btn-auto.auto-btn .seg-label { font-size: 13px; }
+
+  /* Resolution buttons hidden until "more" is tapped */
+  #ctrl-detail-main { display: none; }
+  #ctrl-detail.detail-expanded #ctrl-detail-main { display: flex; }
+
+  /* Two-row stack: hex block on top, admin row below */
+  #seg-track {
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    gap: 4px;
+  }
+
+  #seg-hex-row {
+    display: flex;
+    order: 1;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    padding: 2px;
+  }
+  #seg-admin-row { display: flex; width: 100%; order: 2; }
+
+  /* JS-computed decorations don't work across rows — hide them */
+  #seg-thumb,
+  #seg-hex-highlight { display: none; }
+
+  /* Replicate the thumb highlight directly on the active button */
+  .seg-btn.active { background: rgba(255, 255, 255, 0.15); border-radius: 14px; }
+
+  /* Admin row: bezirk, ortsteil, forests equally spaced */
+  .seg-btn[data-mode="bezirke"],
+  .seg-btn[data-mode="ortsteile"] { flex: 1; justify-content: center; }
+  #btn-forest-toggle { order: 0; margin-left: 0; flex: 1; justify-content: center; }
+
+  /* Only the info card scrolls */
+  #ctrl-info {
+    max-height: calc(100vh - 190px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #ctrl-info::-webkit-scrollbar { display: none; }
+
+  /* Info card and colorbar: only show when a polygon is latched */
+  #ctrl-info[data-state="idle"],
+  #ctrl-info[data-state="hover"] { display: none; }
+  #ctrl-colorbar[data-state="idle"],
+  #ctrl-colorbar[data-state="hover"] { display: none; }
+
+  /* Title/controls row stays fixed while card body scrolls */
+  #ctrl-info > .card-header:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(20, 20, 20, 0.97);
+    /* extend background into card padding so scrolled content is hidden */
+    margin: 0 -13px;
+    padding: 0 13px 6px;
+  }
+}
 

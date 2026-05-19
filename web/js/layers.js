@@ -26,10 +26,39 @@ export function updateDensityScale(map, p95) {
   for (const resolution of HEX_RESOLUTIONS) {
     const sl = `hexes_res${resolution}`;
     try { map.setPaintProperty(`${sl}-icon-trees`, 'icon-color', expr); } catch (_) {}
+    try { map.setPaintProperty(`${sl}-label-genus`, 'text-color', expr); } catch (_) {}
   }
   for (const admin of ['bezirke', 'ortsteile']) {
     try { map.setPaintProperty(`admin_${admin}-icon`, 'icon-color', expr); } catch (_) {}
+    try { map.setPaintProperty(`admin_${admin}-label`, 'text-color', expr); } catch (_) {}
   }
+}
+
+const HAS_TREES = ['!=', ['coalesce', ['get', 'dominant_genus'], ''], ''];
+
+export function updateGenusLabelFilter(map, loadedGenera) {
+  const filter = ['all', HAS_TREES, ['!', ['in', ['get', 'dominant_genus'], ['literal', loadedGenera]]]];
+  for (const resolution of HEX_RESOLUTIONS) {
+    try { map.setFilter(`hexes_res${resolution}-label-genus`, filter); } catch (_) {}
+  }
+  for (const admin of ['bezirke', 'ortsteile']) {
+    try { map.setFilter(`admin_${admin}-label`, filter); } catch (_) {}
+  }
+}
+
+function createLetterBg(size = 32) {
+  const data = new Uint8Array(size * size * 4);
+  const cx = (size - 1) / 2;
+  const r  = size / 2 - 1.5;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (Math.hypot(x - cx, y - cx) <= r) {
+        const i = (y * size + x) * 4;
+        data[i] = 255; data[i + 1] = 255; data[i + 2] = 255; data[i + 3] = 255;
+      }
+    }
+  }
+  return { width: size, height: size, data };
 }
 
 function createHatchPattern(color = '#2255aa', size = 16, lineWidth = 3) {
@@ -52,10 +81,46 @@ function createHatchPattern(color = '#2255aa', size = 16, lineWidth = 3) {
   return { width: size, height: size, data };
 }
 
+// text-size mirrors icon-size × 32 (icon px → CSS px at 2× DPR)
+const HEX_LABEL_SIZES = {
+  6: ['interpolate', ['exponential', 2], ['zoom'],  6,   1.9, 14, 477],
+  7: ['interpolate', ['exponential', 2], ['zoom'],  8,   2.9, 14, 182],
+  8: ['interpolate', ['exponential', 2], ['zoom'], 10,   4.3, 14,  68],
+  9: ['interpolate', ['exponential', 2], ['zoom'], 11,   3.2, 14,  26],
+};
+const ADMIN_LABEL_SIZES = {
+  bezirke:  ['interpolate', ['exponential', 2], ['zoom'],  6,  3.2, 12, 102],
+  ortsteile:['interpolate', ['exponential', 2], ['zoom'],  8,  2.9, 14, 182],
+};
+// Circle bg: 1.8× the tree-icon size (circle SDF is 32px, icon SDF is 64px,
+// so circle icon-size = tree_icon-size × 1.8 × 2 = tree_icon-size × 3.6 / 2... simplified:
+// text = icon × 32, circle display = text × 1.8, circle icon-size = text × 1.8 / 32 = icon × 1.8)
+const HEX_LABEL_CIRCLE_SIZES = {
+  6: ['interpolate', ['exponential', 2], ['zoom'],  6, 0.10, 14, 26.8],
+  7: ['interpolate', ['exponential', 2], ['zoom'],  8, 0.16, 14, 10.3],
+  8: ['interpolate', ['exponential', 2], ['zoom'], 10, 0.24, 14,  3.8],
+  9: ['interpolate', ['exponential', 2], ['zoom'], 11, 0.18, 14,  1.5],
+};
+const ADMIN_LABEL_CIRCLE_SIZES = {
+  bezirke:  ['interpolate', ['exponential', 2], ['zoom'],  6, 0.18, 12,  5.8],
+  ortsteile:['interpolate', ['exponential', 2], ['zoom'],  8, 0.16, 14, 10.3],
+};
+
+// First letter of dominant_genus, '?' for Unbekannt/empty.
+const GENUS_LABEL_FIELD = ['case',
+  ['any',
+    ['==', ['coalesce', ['get', 'dominant_genus'], ''], ''],
+    ['==', ['downcase', ['coalesce', ['get', 'dominant_genus'], '']], 'unbekannt'],
+  ],
+  '?',
+  ['slice', ['upcase', ['coalesce', ['get', 'dominant_genus'], '']], 0, 1],
+];
+
 export function addMapLayers(map, tilesUrl) {
   const forestIconImage = buildForestIconImageExpr();
   const initialDensityColor = densityColorExpr(INITIAL_P95);
 
+  map.addImage('letter-bg', createLetterBg(), { sdf: true });
   map.addSource('berlin-trees', { type: 'vector', url: tilesUrl });
 
   for (const resolution of HEX_RESOLUTIONS) {
@@ -80,6 +145,33 @@ export function addMapLayers(map, tilesUrl) {
       'source-layer': sourceLayer,
       layout: { visibility: resolution === 7 ? 'visible' : 'none' },
       paint: { 'line-color': '#ccc', 'line-width': HEX_OUTLINE_WIDTH, 'line-opacity': 0.7 },
+    });
+
+    map.addLayer({
+      id: `${sourceLayer}-label-genus`,
+      type: 'symbol',
+      source: 'berlin-trees',
+      'source-layer': `${sourceLayer}_centroids`,
+      filter: HAS_TREES,
+      layout: {
+        visibility: resolution === 7 ? 'visible' : 'none',
+        'icon-image': 'letter-bg',
+        'icon-size': HEX_LABEL_CIRCLE_SIZES[resolution],
+        'icon-allow-overlap': true,
+        'icon-anchor': 'center',
+        'text-field': GENUS_LABEL_FIELD,
+        'text-size': HEX_LABEL_SIZES[resolution],
+        'text-allow-overlap': true,
+        'text-anchor': 'center',
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'symbol-avoid-edges': false,
+      },
+      paint: {
+        'icon-color': 'white',
+        'icon-opacity': ['case', ['>', fcp, 67], 0, 0.12],
+        'text-color': initialDensityColor,
+        'text-opacity': ['case', ['>', fcp, 67], 0, 0.85],
+      },
     });
 
     map.addLayer({
@@ -189,6 +281,33 @@ export function addMapLayers(map, tilesUrl) {
     });
 
     map.addLayer({
+      id: `${sourceLayer}-label`,
+      type: 'symbol',
+      source: 'berlin-trees',
+      'source-layer': `${sourceLayer}_centroids`,
+      filter: HAS_TREES,
+      layout: {
+        visibility: 'none',
+        'icon-image': 'letter-bg',
+        'icon-size': ADMIN_LABEL_CIRCLE_SIZES[admin],
+        'icon-allow-overlap': true,
+        'icon-anchor': 'center',
+        'text-field': GENUS_LABEL_FIELD,
+        'text-size': ADMIN_LABEL_SIZES[admin],
+        'text-allow-overlap': true,
+        'text-anchor': 'center',
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'symbol-avoid-edges': false,
+      },
+      paint: {
+        'icon-color': 'white',
+        'icon-opacity': 0.12,
+        'text-color': initialDensityColor,
+        'text-opacity': 0.85,
+      },
+    });
+
+    map.addLayer({
       id: `${sourceLayer}-icon`,
       type: 'symbol',
       source: 'berlin-trees',
@@ -225,10 +344,10 @@ export function addMapLayers(map, tilesUrl) {
     },
   });
 
-  // Selection highlight layers — one per polygon source layer so the outline
-  // is drawn from the actual tile geometry (not a tile-clipped GeoJSON copy).
-  // Filters are set to a no-match value initially and updated by info.js on click.
-  const SELECTED_PAINT = { 'line-color': '#fff', 'line-width': 2.5, 'line-opacity': 0.9, 'line-dasharray': [3, 2] };
+  // Selection highlight layers — solid thick outline on click-to-pin.
+  const SELECTED_PAINT = { 'line-color': '#fff', 'line-width': 3, 'line-opacity': 0.9 };
+  // Hover highlight layers — lighter outline on mouseover.
+  const HOVER_PAINT = { 'line-color': '#fff', 'line-width': 1.5, 'line-opacity': 0.4 };
 
   for (const resolution of HEX_RESOLUTIONS) {
     map.addLayer({
@@ -238,6 +357,14 @@ export function addMapLayers(map, tilesUrl) {
       'source-layer': `hexes_res${resolution}`,
       filter: ['==', ['get', 'h3_index_str'], ''],
       paint: SELECTED_PAINT,
+    });
+    map.addLayer({
+      id: `hexes_res${resolution}-hover`,
+      type: 'line',
+      source: 'berlin-trees',
+      'source-layer': `hexes_res${resolution}`,
+      filter: ['==', ['get', 'h3_index_str'], ''],
+      paint: HOVER_PAINT,
     });
   }
 
@@ -249,6 +376,14 @@ export function addMapLayers(map, tilesUrl) {
       'source-layer': `admin_${admin}`,
       filter: ['==', ['get', 'area_id'], -1],
       paint: SELECTED_PAINT,
+    });
+    map.addLayer({
+      id: `admin_${admin}-hover`,
+      type: 'line',
+      source: 'berlin-trees',
+      'source-layer': `admin_${admin}`,
+      filter: ['==', ['get', 'area_id'], -1],
+      paint: HOVER_PAINT,
     });
   }
 

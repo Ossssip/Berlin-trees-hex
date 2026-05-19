@@ -61,7 +61,7 @@ def load_genera(path: Path) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# PhyloPic API helpers  (same logic as fetch_phylopic.py)
+# PhyloPic API helpers
 # ---------------------------------------------------------------------------
 
 
