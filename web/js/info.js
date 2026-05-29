@@ -248,7 +248,12 @@ function renderHexCard(props, layerType, phylopicIndex, expanded, latched) {
   const stats = [
     trees ? `${trees.toLocaleString()} ${trees === 1 ? 'tree' : 'trees'}` : null,
     density || null,
-    props.berlin_area_km2 ? `${Number(props.berlin_area_km2).toFixed(2)} km²` : null,
+    (() => {
+      const fcp = Number(props.forest_cover_pct) || 0;
+      if (fcp > 10 && props.non_forest_area_km2 != null)
+        return `${Number(props.non_forest_area_km2).toFixed(2)} km² non-forest`;
+      return props.berlin_area_km2 ? `${Number(props.berlin_area_km2).toFixed(2)} km²` : null;
+    })(),
   ].filter(Boolean);
 
   // Count how many genera slots are populated (1–10)
@@ -484,6 +489,77 @@ export function setupInfoCard(map, getPhylopicIndex, { onLatchChange } = {}) {
     'admin_bezirke-fill', 'admin_ortsteile-fill',
     'hexes_res6-fill', 'hexes_res7-fill', 'hexes_res8-fill', 'hexes_res9-fill',
   ];
+  const centroidLayers = [6, 7, 8, 9].flatMap(r => [
+    `hexes_res${r}-label-genus`,
+    `hexes_res${r}-icon-trees`,
+    `hexes_res${r}-icon-forest`,
+  ]);
+
+  // Centroid symbol layers intercept pointer events. Resolve them to the
+  // underlying fill feature so the card and selection work normally.
+  function _resolveCentroidFeature(point) {
+    const hits = map.queryRenderedFeatures(point, { layers: hexLayers });
+    return hits[0] ?? null;
+  }
+
+  centroidLayers.forEach((centroidId) => {
+    map.on('mousemove', centroidId, (e) => {
+      if (_state === 'latched') return;
+      const feature = _resolveCentroidFeature(e.point);
+      if (!feature) return;
+      map.getCanvas().style.cursor = 'pointer';
+      const props = feature.properties;
+      const id = _featureId(props);
+      if (_state === 'hover' && _latchedId === id) return;
+      _latchedId = id;
+      const layerId = feature.layer.id;
+      const type = _layerType(layerId);
+      _state = 'hover';
+      _currentCard = { props, layerId, type };
+      _highlightHover(layerId, props);
+      _setInfoState('hover');
+      requestAnimationFrame(() => {
+        if (_state !== 'hover' || _latchedId !== id) return;
+        showCard(renderHexCard(props, type, _getPhylopicIndex?.() ?? {}, _expanded, true));
+      });
+    });
+
+    map.on('mouseleave', centroidId, () => {
+      if (_state === 'latched') return;
+      map.getCanvas().style.cursor = '';
+      _latchedId = null;
+      _clearHoverHighlight();
+      showIdle();
+    });
+
+    map.on('click', centroidId, (e) => {
+      e.preventDefault();
+      const feature = _resolveCentroidFeature(e.point);
+      if (!feature) return;
+      const props = feature.properties;
+      const layerId = feature.layer.id;
+      const type = _layerType(layerId);
+      const id = _featureId(props);
+
+      if (_state === 'latched' && _latchedId === id) {
+        _latchedId = null;
+        _currentCard = null;
+        _state = 'idle';
+        _clearAllSelections();
+        onLatchChange?.(null);
+        showIdle();
+      } else {
+        _state = 'latched';
+        _latchedId = id;
+        _currentCard = { props, layerId, type };
+        _clearHoverHighlight();
+        _highlightFeature(layerId, props, feature);
+        _setInfoState('latched');
+        onLatchChange?.({ layerId, props, type });
+        _renderCurrentCard();
+      }
+    });
+  });
 
   [...hexLayers, 'trees-circle'].forEach((layerId) => {
     map.on('mousemove', layerId, (e) => {
@@ -547,7 +623,7 @@ export function setupInfoCard(map, getPhylopicIndex, { onLatchChange } = {}) {
   // Click on empty space → unlatch
   map.on('click', (e) => {
     if (_state !== 'latched') return;
-    const hits = map.queryRenderedFeatures(e.point, { layers: [...hexLayers, 'trees-circle'] });
+    const hits = map.queryRenderedFeatures(e.point, { layers: [...hexLayers, ...centroidLayers, 'trees-circle'] });
     if (hits.length === 0) {
       _latchedId = null;
       _currentCard = null;
