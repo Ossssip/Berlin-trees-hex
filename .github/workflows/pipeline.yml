@@ -12,14 +12,14 @@ on:
       - '.github/workflows/pipeline.yml'
   workflow_dispatch:
     inputs:
-      force_fetch:
-        description: 'Force re-fetch all WFS sources (ignore cache)'
-        type: boolean
-        default: false
-      force_tiles:
-        description: 'Force tile regeneration even if data is unchanged'
-        type: boolean
-        default: false
+      start_from:
+        description: 'Start pipeline from this stage (fetch → transform → tiles)'
+        type: choice
+        options:
+          - fetch
+          - transform
+          - tiles
+        default: fetch
 
 permissions:
   contents: write   # push checksums commit + upload release assets
@@ -60,49 +60,39 @@ jobs:
           fi
           echo "needs_update=$([ $CODE -eq 1 ] && echo true || echo false)" >> $GITHUB_OUTPUT
 
-  # ── Job 2: full pipeline ─────────────────────────────────────────────────────
-  run-pipeline:
+  # ── Job 2: fetch raw WFS data ────────────────────────────────────────────────
+  fetch:
     needs: check-updates
-    if: needs.check-updates.outputs.needs_update == 'true' || inputs.force_fetch == true || inputs.force_tiles == true
+    if: |
+      needs.check-updates.result == 'success' && (
+        (github.event_name != 'workflow_dispatch' && needs.check-updates.outputs.needs_update == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.start_from == 'fetch')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
 
       - name: Install Python deps
         run: pip install -r requirements-ci.txt
-
-      - name: Install tippecanoe (felt fork)
-        run: |
-          sudo apt-get install -y gcc g++ make libsqlite3-dev zlib1g-dev
-          git clone --depth 1 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
-          cd /tmp/tippecanoe && make -j$(nproc) && sudo make install
-          tippecanoe --version
-
-      - name: Install pmtiles CLI
-        run: |
-          curl -sL https://github.com/protomaps/go-pmtiles/releases/download/v1.30.2/go-pmtiles_1.30.2_Linux_x86_64.tar.gz \
-            | sudo tar xz -C /usr/local/bin pmtiles
-          pmtiles version
 
       # ── Per-source raw data: restore from cache or fetch fresh ──────────────
 
       - name: Restore raw — alkis_ortsteile
         id: cache-alkis
-        if: inputs.force_fetch != true
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/raw/alkis_ortsteile.parquet
           key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}
 
       - name: Restore checkpoint — alkis_ortsteile
-        if: inputs.force_fetch != true && steps.cache-alkis.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        if: steps.cache-alkis.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: data/raw/alkis_ortsteile.partial.parquet
           key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-partial
@@ -114,22 +104,21 @@ jobs:
 
       - name: Save checkpoint — alkis_ortsteile
         if: always() && steps.fetch-alkis.outcome == 'failure'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/raw/alkis_ortsteile.partial.parquet
           key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-partial
 
       - name: Restore raw — baumbestand_anlagen
         id: cache-anlagen
-        if: inputs.force_fetch != true
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/raw/baumbestand_anlagen.parquet
           key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}
 
       - name: Restore checkpoint — baumbestand_anlagen
-        if: inputs.force_fetch != true && steps.cache-anlagen.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        if: steps.cache-anlagen.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: data/raw/baumbestand_anlagen.partial.parquet
           key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-partial
@@ -141,22 +130,21 @@ jobs:
 
       - name: Save checkpoint — baumbestand_anlagen
         if: always() && steps.fetch-anlagen.outcome == 'failure'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/raw/baumbestand_anlagen.partial.parquet
           key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-partial
 
       - name: Restore raw — baumbestand_strassen
         id: cache-strassen
-        if: inputs.force_fetch != true
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/raw/baumbestand_strassen.parquet
           key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}
 
       - name: Restore checkpoint — baumbestand_strassen
-        if: inputs.force_fetch != true && steps.cache-strassen.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        if: steps.cache-strassen.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: data/raw/baumbestand_strassen.partial.parquet
           key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-partial
@@ -168,22 +156,21 @@ jobs:
 
       - name: Save checkpoint — baumbestand_strassen
         if: always() && steps.fetch-strassen.outcome == 'failure'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/raw/baumbestand_strassen.partial.parquet
           key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-partial
 
       - name: Restore raw — gruen_berlin
         id: cache-gruen
-        if: inputs.force_fetch != true
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/raw/gruen_berlin.parquet
           key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}
 
       - name: Restore checkpoint — gruen_berlin
-        if: inputs.force_fetch != true && steps.cache-gruen.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        if: steps.cache-gruen.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: data/raw/gruen_berlin.partial.parquet
           key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}-partial
@@ -195,22 +182,21 @@ jobs:
 
       - name: Save checkpoint — gruen_berlin
         if: always() && steps.fetch-gruen.outcome == 'failure'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/raw/gruen_berlin.partial.parquet
           key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}-partial
 
       - name: Restore raw — forstbetriebskarte
         id: cache-forst
-        if: inputs.force_fetch != true
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/raw/forstbetriebskarte.parquet
           key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
 
       - name: Restore checkpoint — forstbetriebskarte
-        if: inputs.force_fetch != true && steps.cache-forst.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        if: steps.cache-forst.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: data/raw/forstbetriebskarte.partial.parquet
           key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-partial
@@ -222,12 +208,67 @@ jobs:
 
       - name: Save checkpoint — forstbetriebskarte
         if: always() && steps.fetch-forst.outcome == 'failure'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/raw/forstbetriebskarte.partial.parquet
           key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-partial
 
-      # ── Transform → Aggregate → Build tiles ─────────────────────────────────
+  # ── Job 3: transform (init_db + dbt) ─────────────────────────────────────────
+  transform:
+    needs: [check-updates, fetch]
+    if: |
+      always() &&
+      needs.check-updates.result == 'success' &&
+      (
+        needs.fetch.result == 'success' ||
+        (github.event_name == 'workflow_dispatch' && inputs.start_from == 'transform')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install Python deps
+        run: pip install -r requirements-ci.txt
+
+      # ── Restore raw parquets saved by the fetch job ──────────────────────────
+
+      - name: Restore raw — alkis_ortsteile
+        uses: actions/cache@v5
+        with:
+          path: data/raw/alkis_ortsteile.parquet
+          key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}
+
+      - name: Restore raw — baumbestand_anlagen
+        uses: actions/cache@v5
+        with:
+          path: data/raw/baumbestand_anlagen.parquet
+          key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}
+
+      - name: Restore raw — baumbestand_strassen
+        uses: actions/cache@v5
+        with:
+          path: data/raw/baumbestand_strassen.parquet
+          key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}
+
+      - name: Restore raw — gruen_berlin
+        uses: actions/cache@v5
+        with:
+          path: data/raw/gruen_berlin.parquet
+          key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}
+
+      - name: Restore raw — forstbetriebskarte
+        uses: actions/cache@v5
+        with:
+          path: data/raw/forstbetriebskarte.parquet
+          key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
+
+      # ── Run dbt pipeline ─────────────────────────────────────────────────────
 
       - name: Transform
         run: |
@@ -235,6 +276,91 @@ jobs:
           dbt seed --profiles-dir ./dbt --project-dir ./dbt
           dbt run --profiles-dir ./dbt --project-dir ./dbt
           dbt test --profiles-dir ./dbt --project-dir ./dbt
+
+      # ── Cache DuckDB for the tiles job ───────────────────────────────────────
+
+      - name: Save DuckDB to cache
+        uses: actions/cache/save@v5
+        with:
+          path: data/berlin_trees.duckdb
+          key: duckdb-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-${{ needs.check-updates.outputs.count_gruen_berlin }}-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-${{ runner.os }}
+
+  # ── Job 4: build tiles, commit checksums, release, upload ───────────────────
+  tiles:
+    needs: [check-updates, transform]
+    if: |
+      always() &&
+      needs.check-updates.result == 'success' &&
+      (
+        needs.transform.result == 'success' ||
+        (github.event_name == 'workflow_dispatch' && inputs.start_from == 'tiles')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install Python deps
+        run: pip install -r requirements-ci.txt
+
+      - name: Get tippecanoe HEAD SHA
+        id: tippecanoe-sha
+        run: echo "sha=$(git ls-remote https://github.com/felt/tippecanoe.git HEAD | cut -f1)" >> $GITHUB_OUTPUT
+
+      - name: Cache tippecanoe
+        id: cache-tippecanoe
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/tippecanoe
+          key: tippecanoe-${{ steps.tippecanoe-sha.outputs.sha }}-${{ runner.os }}
+
+      - name: Install tippecanoe (felt fork)
+        if: steps.cache-tippecanoe.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y gcc g++ make libsqlite3-dev zlib1g-dev
+          git clone --depth 1 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          cd /tmp/tippecanoe && make -j$(nproc)
+          mkdir -p ~/.local/tippecanoe
+          cp tippecanoe tile-join ~/.local/tippecanoe/
+
+      - name: Add tippecanoe to PATH
+        run: |
+          sudo cp ~/.local/tippecanoe/* /usr/local/bin/
+          tippecanoe --version
+
+      - name: Cache pmtiles CLI
+        id: cache-pmtiles
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/pmtiles
+          key: pmtiles-v1.30.2-${{ runner.os }}
+
+      - name: Install pmtiles CLI
+        if: steps.cache-pmtiles.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/pmtiles
+          curl -sL https://github.com/protomaps/go-pmtiles/releases/download/v1.30.2/go-pmtiles_1.30.2_Linux_x86_64.tar.gz \
+            | tar xz -C ~/.local/pmtiles pmtiles
+
+      - name: Add pmtiles to PATH
+        run: |
+          sudo cp ~/.local/pmtiles/pmtiles /usr/local/bin/
+          pmtiles version
+
+      # ── Restore DuckDB produced by the transform job ─────────────────────────
+
+      - name: Restore DuckDB
+        uses: actions/cache@v5
+        with:
+          path: data/berlin_trees.duckdb
+          key: duckdb-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-${{ needs.check-updates.outputs.count_gruen_berlin }}-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-${{ runner.os }}
 
       - name: Build tiles
         run: python pipeline/build_tiles.py
@@ -275,9 +401,10 @@ jobs:
           path: web/
           retention-days: 1
 
-  # ── Job 3: GitHub Pages deploy ───────────────────────────────────────────────
+  # ── Job 5: GitHub Pages deploy ───────────────────────────────────────────────
   deploy:
-    needs: run-pipeline
+    needs: tiles
+    if: always() && needs.tiles.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
