@@ -7,7 +7,7 @@ Strategy: build separate pmtiles files with scoped zoom ranges, then
 merge them with tile-join into one berlin_trees.pmtiles.
 
     hexes          (agg_h3_res6–9 + agg_bezirke/ortsteile)  z4–z17
-    forests        (data/raw/forstbetriebskarte.parquet)     z4–z17
+    forests        (agg_forests + agg_forest_union)          z4–z17
     trees          (int_trees_unified)                       z6–z17
 
 Run:
@@ -24,8 +24,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import duckdb
-import geopandas as gpd
-from shapely.geometry import MultiPolygon, Polygon
 
 DB_PATH = Path("data/berlin_trees.duckdb")
 TILES_INPUT = Path("data/tiles_input")
@@ -43,23 +41,6 @@ TREE_COLS = [
     "tree_age",
     "source",
 ]
-
-# Forest stand columns useful for map popups.
-FOREST_COLS = [
-    "id",
-    "lage",
-    "bezirk",
-    "betrkl",
-    "grpalter",
-    "gis_area",
-    "s1_1_ba",
-    "s1_1_deuts",
-    "s1_1_misch",
-    "s1_1_bhd",
-    "s1_1_hoehe",
-]
-
-RAW = Path("data/raw")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -180,39 +161,6 @@ def table_centroids_to_flatgeobuf(
     _copy_query_to_flatgeobuf(con, out_path, [DB_PATH], select_sql, f"{table} centroids")
 
 
-def geopandas_to_vector(
-    out_path: Path,
-    input_paths: list[Path],
-    builder,
-    label: str,
-    driver: str = "FlatGeobuf",
-) -> None:
-    if _is_fresh(out_path, input_paths):
-        log.info("Skipping %s → %s (cached)", label, out_path.name)
-        return
-
-    log.info("Building %s → %s (%s)", label, out_path.name, driver)
-    with _timed(f"Build {out_path.name}"):
-        gdf = builder()
-        gdf.to_file(out_path, driver=driver)
-    mb = out_path.stat().st_size / 1024 / 1024
-    log.info("  %d features, %.1f MB", len(gdf), mb)
-
-
-def _as_multipolygon(geometry):
-    if geometry is None or geometry.is_empty:
-        return geometry
-    if isinstance(geometry, Polygon):
-        return MultiPolygon([geometry])
-    return geometry
-
-
-def _normalize_multipolygons(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    normalized = gdf.copy()
-    normalized.geometry = normalized.geometry.map(_as_multipolygon)
-    return normalized
-
-
 def tippecanoe(
     output: Path,
     min_zoom: int,
@@ -295,52 +243,10 @@ def main() -> None:
             con, f"agg_h3_res{res}", TILES_INPUT / f"h3_res{res}_centroids.fgb"
         )
 
-    # --- 2. Forest layers (geopandas — morphological buffer/union) ------------
+    # --- 2. Forest layers (DuckDB mart tables) ----------------------------------
 
-    forest_inputs = [RAW / "forstbetriebskarte.parquet", RAW / "alkis_ortsteile.parquet"]
-    forests_out = TILES_INPUT / "forests.geojson"
-    forests_union_out = TILES_INPUT / "forests_union.geojson"
-    need_city_boundary = not (
-        _is_fresh(forests_out, forest_inputs) and _is_fresh(forests_union_out, forest_inputs)
-    )
-    city_boundary = None
-    if need_city_boundary:
-        log.info("Building city boundary ...")
-        gdf_ortsteile = gpd.read_parquet(RAW / "alkis_ortsteile.parquet")
-        city_boundary = gdf_ortsteile.union_all()
-
-    geopandas_to_vector(
-        forests_out,
-        forest_inputs,
-        lambda: (
-            lambda gdf_forest: _normalize_multipolygons(
-                gdf_forest[[c for c in FOREST_COLS if c in gdf_forest.columns] + ["geometry"]]
-            ).to_crs("EPSG:4326")
-        )(gpd.clip(gpd.read_parquet(RAW / "forstbetriebskarte.parquet"), city_boundary)),
-        "forest stands",
-        driver="GeoJSON",
-    )
-
-    geopandas_to_vector(
-        forests_union_out,
-        forest_inputs,
-        lambda: (
-            lambda smoothed: _normalize_multipolygons(
-                gpd.GeoDataFrame(
-                    geometry=gpd.GeoSeries([smoothed], crs="EPSG:25833").explode(index_parts=False),
-                    crs="EPSG:25833",
-                )
-            ).to_crs("EPSG:4326")
-        )(
-            gpd.clip(gpd.read_parquet(RAW / "forstbetriebskarte.parquet"), city_boundary)
-            .geometry.buffer(50)
-            .union_all()
-            .buffer(-50)
-            .intersection(city_boundary)
-        ),
-        "forest union",
-        driver="GeoJSON",
-    )
+    table_to_flatgeobuf(con, "agg_forests", TILES_INPUT / "forests.fgb")
+    table_to_flatgeobuf(con, "agg_forest_union", TILES_INPUT / "forests_union.fgb")
 
     # --- 3. tippecanoe: all bands in parallel ---------------------------------
     tmp_dir = Path(tempfile.mkdtemp(prefix="bt_tiles_", dir="/dev/shm"))
@@ -403,8 +309,8 @@ def main() -> None:
                 min_zoom=4,
                 max_zoom=17,
                 layers=[
-                    ("forests", forests_out),
-                    ("forests_union", forests_union_out),
+                    ("forests", TILES_INPUT / "forests.fgb"),
+                    ("forests_union", TILES_INPUT / "forests_union.fgb"),
                 ],
                 extra=["--no-tile-size-limit", "--no-simplification-of-shared-nodes", "--no-tile-stats"],
                 read_parallel=True,

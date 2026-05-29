@@ -33,10 +33,7 @@ let phylopicIndex = {};
 const getPhylopicIndex = () => phylopicIndex;
 
 map.on('load', () => {
-  // Derive base from this module's URL so the path is correct on GitHub Pages
-  // (window.location.origin alone would lose the /repo-name/ prefix).
-  const _base = new URL('..', import.meta.url).href;
-  const tilesUrl = `pmtiles://${_base}public/berlin_trees.pmtiles`;
+  const tilesUrl = 'pmtiles://https://berlin-trees-pmtiles.ossssip.workers.dev/';
 
   addMapLayers(map, tilesUrl);
 

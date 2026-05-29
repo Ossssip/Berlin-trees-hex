@@ -33,7 +33,6 @@ PAGE_SIZE = 1000  # features per WFS request
 MAX_RETRIES = 5  # attempts per page before giving up
 RETRY_BACKOFF_BASE = 2.0  # exponential backoff base (seconds)
 REQUEST_TIMEOUT = 60  # seconds
-CHECKPOINT_INTERVAL = 100_000  # write .partial.parquet every N features
 
 logging.basicConfig(
     level=logging.INFO,
@@ -162,42 +161,42 @@ def fetch_source(source_key: str, max_features: int | None, out_path: Path) -> g
                 start = len(checkpoint_gdf)
                 log.info("Resuming from checkpoint: %d / %d features", start, fetch_limit)
 
-        # Step 3: paginate
-        next_checkpoint = ((start // CHECKPOINT_INTERVAL) + 1) * CHECKPOINT_INTERVAL
+        # Step 3: paginate — checkpoint written only on failure
         page_num = start // PAGE_SIZE
 
-        while start < fetch_limit:
-            page_count = min(PAGE_SIZE, fetch_limit - start)
-            page_num += 1
-            log.info(
-                "  Page %d  startIndex=%d  count=%d  (%.1f%%)",
-                page_num,
-                start,
-                page_count,
-                100.0 * start / fetch_limit if fetch_limit else 100,
-            )
-            page = fetch_page(session, url, layer, start, page_count, crs)
-
-            if page.empty:
-                log.info("  Empty page returned — assuming end of data.")
-                break
-
-            pages.append(page)
-            returned = len(page)
-            start += returned
-
-            if start >= next_checkpoint:
-                _write_checkpoint(pages, checkpoint_path)
-                next_checkpoint += CHECKPOINT_INTERVAL
-
-            # If server returned fewer than requested, we've hit the end
-            if returned < page_count:
+        try:
+            while start < fetch_limit:
+                page_count = min(PAGE_SIZE, fetch_limit - start)
+                page_num += 1
                 log.info(
-                    "  Server returned %d < %d requested — end of data.",
-                    returned,
+                    "  Page %d  startIndex=%d  count=%d  (%.1f%%)",
+                    page_num,
+                    start,
                     page_count,
+                    100.0 * start / fetch_limit if fetch_limit else 100,
                 )
-                break
+                page = fetch_page(session, url, layer, start, page_count, crs)
+
+                if page.empty:
+                    log.info("  Empty page returned — assuming end of data.")
+                    break
+
+                pages.append(page)
+                returned = len(page)
+                start += returned
+
+                # If server returned fewer than requested, we've hit the end
+                if returned < page_count:
+                    log.info(
+                        "  Server returned %d < %d requested — end of data.",
+                        returned,
+                        page_count,
+                    )
+                    break
+        except Exception:
+            if pages:
+                _write_checkpoint(pages, checkpoint_path)
+            raise
 
     if not pages:
         raise RuntimeError("No features fetched — check URL and layer name.")
