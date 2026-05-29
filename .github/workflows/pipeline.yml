@@ -30,6 +30,7 @@ jobs:
 
   # ── Job 1: lightweight WFS count check ──────────────────────────────────────
   check-updates:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       needs_update: ${{ steps.check.outputs.needs_update }}
@@ -64,8 +65,10 @@ jobs:
   fetch:
     needs: check-updates
     if: |
-      needs.check-updates.result == 'success' && (
-        (github.event_name != 'workflow_dispatch' && needs.check-updates.outputs.needs_update == 'true') ||
+      always() &&
+      (needs.check-updates.result == 'success' || needs.check-updates.result == 'skipped') &&
+      (
+        (needs.check-updates.result == 'success' && needs.check-updates.outputs.needs_update == 'true') ||
         (github.event_name == 'workflow_dispatch' && inputs.start_from == 'fetch')
       )
     runs-on: ubuntu-latest
@@ -218,7 +221,7 @@ jobs:
     needs: [check-updates, fetch]
     if: |
       always() &&
-      needs.check-updates.result == 'success' &&
+      (needs.check-updates.result == 'success' || needs.check-updates.result == 'skipped') &&
       (
         needs.fetch.result == 'success' ||
         (github.event_name == 'workflow_dispatch' && inputs.start_from == 'transform')
@@ -243,30 +246,35 @@ jobs:
         with:
           path: data/raw/alkis_ortsteile.parquet
           key: wfs-alkis_ortsteile-${{ needs.check-updates.outputs.count_alkis_ortsteile }}
+          restore-keys: wfs-alkis_ortsteile-
 
       - name: Restore raw — baumbestand_anlagen
         uses: actions/cache@v5
         with:
           path: data/raw/baumbestand_anlagen.parquet
           key: wfs-baumbestand_anlagen-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}
+          restore-keys: wfs-baumbestand_anlagen-
 
       - name: Restore raw — baumbestand_strassen
         uses: actions/cache@v5
         with:
           path: data/raw/baumbestand_strassen.parquet
           key: wfs-baumbestand_strassen-${{ needs.check-updates.outputs.count_baumbestand_strassen }}
+          restore-keys: wfs-baumbestand_strassen-
 
       - name: Restore raw — gruen_berlin
         uses: actions/cache@v5
         with:
           path: data/raw/gruen_berlin.parquet
           key: wfs-gruen_berlin-${{ needs.check-updates.outputs.count_gruen_berlin }}
+          restore-keys: wfs-gruen_berlin-
 
       - name: Restore raw — forstbetriebskarte
         uses: actions/cache@v5
         with:
           path: data/raw/forstbetriebskarte.parquet
           key: wfs-forstbetriebskarte-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
+          restore-keys: wfs-forstbetriebskarte-
 
       # ── Run dbt pipeline ─────────────────────────────────────────────────────
 
@@ -285,14 +293,14 @@ jobs:
           path: |
             data/berlin_trees.duckdb
             ~/.duckdb/extensions/
-          key: duckdb-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-${{ needs.check-updates.outputs.count_gruen_berlin }}-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-${{ runner.os }}
+          key: duckdb-${{ runner.os }}-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-${{ needs.check-updates.outputs.count_gruen_berlin }}-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
 
   # ── Job 4: build tiles, commit checksums, release, upload ───────────────────
   tiles:
     needs: [check-updates, transform]
     if: |
       always() &&
-      needs.check-updates.result == 'success' &&
+      (needs.check-updates.result == 'success' || needs.check-updates.result == 'skipped') &&
       (
         needs.transform.result == 'success' ||
         (github.event_name == 'workflow_dispatch' && inputs.start_from == 'tiles')
@@ -359,12 +367,21 @@ jobs:
       # ── Restore DuckDB produced by the transform job ─────────────────────────
 
       - name: Restore DuckDB
+        id: cache-duckdb
         uses: actions/cache@v5
         with:
           path: |
             data/berlin_trees.duckdb
             ~/.duckdb/extensions/
-          key: duckdb-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-${{ needs.check-updates.outputs.count_gruen_berlin }}-${{ needs.check-updates.outputs.count_forstbetriebskarte }}-${{ runner.os }}
+          key: duckdb-${{ runner.os }}-${{ needs.check-updates.outputs.count_alkis_ortsteile }}-${{ needs.check-updates.outputs.count_baumbestand_anlagen }}-${{ needs.check-updates.outputs.count_baumbestand_strassen }}-${{ needs.check-updates.outputs.count_gruen_berlin }}-${{ needs.check-updates.outputs.count_forstbetriebskarte }}
+          restore-keys: duckdb-${{ runner.os }}-
+
+      - name: Verify DuckDB exists
+        run: |
+          if [ ! -f data/berlin_trees.duckdb ]; then
+            echo "::error::DuckDB not found in cache. Run the pipeline from 'fetch' or 'transform' first to seed the cache."
+            exit 1
+          fi
 
       - name: Build tiles
         run: python pipeline/build_tiles.py
