@@ -16,6 +16,10 @@ on:
         description: 'Force re-fetch all WFS sources (ignore cache)'
         type: boolean
         default: false
+      force_tiles:
+        description: 'Force tile regeneration even if data is unchanged'
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # push checksums commit + upload release assets
@@ -59,7 +63,7 @@ jobs:
   # ── Job 2: full pipeline ─────────────────────────────────────────────────────
   run-pipeline:
     needs: check-updates
-    if: needs.check-updates.outputs.needs_update == 'true' || inputs.force_fetch == true
+    if: needs.check-updates.outputs.needs_update == 'true' || inputs.force_fetch == true || inputs.force_tiles == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
